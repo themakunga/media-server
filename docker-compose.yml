@@ -1,0 +1,82 @@
+version: '3'
+
+services:
+  # docker related auto update
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - ./.env
+    restart: unless-stopped
+
+  reverse_proxy:
+    image: nginx:alpine
+    container_name: reverse_proxy
+    hostname: reverse_proxy
+    restart: unless-stopped
+    volumes:
+      - ${DATA_DIR}/not_found:/usr/share/nginx/html/404
+      - ${CONF_DIR}/reverse_proxy/nginx.conf:/etc/nginx/nginx.conf
+      - ${CONF_DIR}/reverse_proxy/conf.d:/etc/nginx/conf.d
+      - ${CONF_DIR}/reverse_proxy/includes:/etc/nginx/includes
+      - ${DATA_DIR}/reverse_proxy/logs:/var/log/nginx
+      - ${DATA_DIR}/minica/_.${DOMAIN}:/etc/nginx/ssl
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - minica
+      - portainer
+
+  minica:
+    image: golang:alpine
+    container_name: minica-ssl
+    hostname: minica
+    volumes:
+      - ${CONF_DIR}/minica:/opt/minica
+      - ${DATA_DIR}/minica:/home/minica
+    command:
+      - /bin/sh
+      - -c
+      - |
+        go install github.com/jsha/minica@latest
+        mkdir -p /home/mininca
+        cd /home/minica
+        minica --domains '*.${DOMAIN}'
+
+  portainer:
+    image: portainer/portainer
+    hostname: portainer
+    container_name: portainer
+    restart: always
+    command: -H unix:///var/run/docker.sock
+    expose:
+      - 9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DATA_DIR}/portainer:/data
+      - ${SHARED_DIR}:/shared
+    environment:
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+  template:
+    image: node:alpine
+    container_name: template
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./docker-compose.yml:/files/docker-compose.yml:ro
+      - ${DATA_DIR}/template:/template:ro
+      - ${CONF_DIR}/reverse_proxy/conf.d:/rendered:rw
+      - ${CONF_DIR}/template:/opt/process:rw
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cd /opt/process
+        npm install
+        npm run process
