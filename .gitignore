@@ -4,6 +4,7 @@
 ### dotenv ###
 .env
 .htpasswd
+**/acme.json
 *.log
 *.pem
 **/node_modules/
