@@ -50,6 +50,10 @@ services:
       - --global.sendAnonymousUsage=false
       - --entryPoints.http.address=:80
       - --entryPoints.https.address=:443
+      # auto force SSL
+      - --entryPoints.http.http.redirections.entrypoint.to=https
+      - --entrypoints.http.http.redirections.entrypoint.scheme=https
+      - --entryPoints.http.http.redirections.entryPoint.permanent=true
       # Allow these IPs to set the X-Forwarded-* headers 
       - --entrypoints.https.forwardedHeaders.trustedIPs=$CLOUDFLARE_IPS,$LOCAL_IPS
       - --entryPoints.traefik.address=:8080
@@ -123,6 +127,24 @@ services:
       - traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAIN 
       - traefik.http.routers.traefik-rtr.service=api@internal
       - traefik.http.routers.traefik-rtr.middlewares.chain-basic-auth@file 
+  portainer:
+    <<: *common-keys-core
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DAPPDATA}/portainer/data:/data
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.portainer.entrypoints=https
+      - traefik.http.routers.portainer.rule=Host(`portainer.$DOMAIN`)
+      - traefik.http.routers.portainer.tls=true
+      - traefik.http.routers.portainer.middlewares=chain-no-auth@file
+      - traefik.http.routers.portainer.service=portainer-svc
+      - traefik.http.services.portainer-svc.loadbalancer.server.port=9000
   heimdall:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/heimdall:latest
@@ -155,3 +177,71 @@ services:
       - traefik.http.routers.librespeed.middlewares=chain-basic-auth@file
       - traefik.http.routers.librespeed.service=librespeed-svc
       - traefik.http.services.librespeed-svc.loadbalancer.server.port=80
+  thelounge:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/thelounge:latest
+    container_name: thelounge
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.thelounge.entrypoints=https
+      - traefik.http.routers.thelounge.rule=Host(`irc.$DOMAIN`)
+      - traefik.http.routers.thelounge.tls=true
+      - traefik.http.routers.thelounge.middlewares=chain-basic-auth@file
+      - traefik.http.routers.thelounge.service=thelounge-svc
+      - traefik.http.services.thelounge-svc.loadbalancer.server.port=9000
+    volumes:
+      - $DAPPDATA/thelounge:/config
+  jackett:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    environment:
+      <<: *default-tz-puid-pgid
+      AUTO_UPDATE: true
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jackett.entrypoints=https
+      - traefik.http.routers.jackett.rule=Host(`jackett.$DOMAIN`)
+      - traefik.http.routers.jackett.tls=true
+      - traefik.http.routers.jackett.middlewares=chain-basic-auth@file
+      - traefik.http.routers.jackett.service=jackett-svc
+      - traefik.http.services.jackett-svc.loadbalancer.server.port=9117
+    volumes:
+      - $DAPPDATA/jackett:/config
+      - $DSHARED/blackhole:/downloads
+  sonarr:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sonarr.entrypoints=https
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.$DOMAIN`)
+      - traefik.http.routers.sonarr.tls=true
+      - traefik.http.routers.sonarr.middlewares=chain-basic-auth@file
+      - traefik.http.routers.sonarr.service=sonarr-svc
+      - traefik.http.services.sonarr-svc.loadbalancer.server.port=8989
+    volumes:
+      - $DAPPDATA/sonarr:/config
+      - $DMEDIA/tv:/tv
+      - $DMEDIA/movies:/movies
+      - $DMEDIA/downloads:/downloads
+  radarr:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.radarr.entryPoints.https
+      - traefik.http.routers.radarr.rule=Host(`radarr.$DOMAIN`)
+      - traefik.http.routers.radarr.tls=true
+      - traefik.http.routers.radarr.middlewares=chain-basic-auth@file
+      - traefik.http.routers.radarr.service=radarr-svc
+      - traefik.http.services.radarr-svc.loadbalancer.server.port=7878
+

@@ -8,7 +8,8 @@
 *.log
 *.pem
 **/node_modules/
-
+appdata/
+!appdata/traefik/**/*
 ### Linux ###
 *~
 
