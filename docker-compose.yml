@@ -9,14 +9,14 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 192.168.90.0/24
+        - subnet: $SUBNET
 
 ########################## EXTENSION FIELDS ########################
 
 x-environment: &default-tz-puid-pgid
-  TZ: ${TZ}
-  PUID: ${PUID}
-  PGID: ${PGID}
+  TZ: $TZ
+  PUID: $PUID
+  PGID: $PGID
 
 x-common-keys-core: &common-keys-core
   networks:
@@ -63,7 +63,7 @@ services:
       # - --serversTransport.insecureSkipVerify=true
       - --log=true
       - --log.filePath=/logs/traefik.log
-      - --log.level=INFO # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+      - --log.level=$LOG_LEVEL # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
       - --accessLog=true
       - --accessLog.filePath=/logs/access.log
       - --accessLog.bufferingSize=100 # Configuring a buffer of 100 lines
@@ -199,7 +199,7 @@ services:
     container_name: jackett
     environment:
       <<: *default-tz-puid-pgid
-      AUTO_UPDATE: true
+      AUTO_UPDATE: $JACKETT_AUTO_UPDATE
     labels:
       - traefik.enable=true
       - traefik.http.routers.jackett.entrypoints=https
