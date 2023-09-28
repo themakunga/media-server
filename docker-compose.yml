@@ -294,30 +294,31 @@ services:
       - $DAPPDATA/bazarr:/config
       - $DMEDIA/tv:/tv 
       - $DMEDIA/movies:/movies
-  jellyfin:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    environment:
-      <<: *default-tz-puid-pgid
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.jellyfin.entrypoints=https
-      - traefik.http.routers.jellyfin.rule=Host(`jellyfin.$DOMAIN`)
-      - traefik.http.routers.jellyfin.tls=true
-      - traefik.http.routers.jellyfin.middlewares=chain-no-auth@file
-      - traefik.http.routers.jellyfin.service=jellyfin-svc
-      - traefik.http.services.jellyfin-svc.loadbalancer.server.port=8096
-    ports:
-      - 1900:1900/udp
-      - 7359:7359/udp
-    volumes:
-      - $DAPPDATA/jellyfin:/config
-      - $DMEDIA/movies:/movies
-      - $DMEDIA/tv:/tv
-    devices:
+  # jellyfin:
+  #  <<: *common-keys-apps
+  #  image: lscr.io/linuxserver/jellyfin:latest
+  
+  #  container_name: jellyfin
+    #  environment:
+#    <<: *default-tz-puid-pgid
+    #    labels:
+      # - traefik.enable=true
+      #- traefik.http.routers.jellyfin.entrypoints=https
+      #- traefik.http.routers.jellyfin.rule=Host(`jellyfin.$DOMAIN`)
+      #- traefik.http.routers.jellyfin.tls=true
+      #- traefik.http.routers.jellyfin.middlewares=chain-no-auth@file
+      #- traefik.http.routers.jellyfin.service=jellyfin-svc
+      #- traefik.http.services.jellyfin-svc.loadbalancer.server.port=8096
+    #ports:
+      #- 1900:1900/udp
+      #- 7359:7359/udp
+    #volumes:
+      # - $DAPPDATA/jellyfin:/config
+      #- $DMEDIA/movies:/movies
+      #- $DMEDIA/tv:/tv
+    #devices:
       # INTEL ACCELERARION HARDWARE
-      - /dev/dri:/dev/dri
+      # - /dev/dri:/dev/dri
   transmission:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/transmission:latest
@@ -339,3 +340,49 @@ services:
     ports:
       - 51413:51413
       - 51413:51413/udp
+  plex: 
+    <<: *common-keys-apps
+    # Comment for amd apu/gpu acceleration
+    image: lscr.io/linuxserver/plex:latest
+    # uncomment if you use amd acceleration
+    # build:
+    #   context: $DAPPDATA/plex/build
+    #  dockerfile: ./amd.Dockerfile
+    container_name: plex
+    environment:
+      <<: *default-tz-puid-pgid
+      VERSION: docker
+      ADVERTISE_IP: https://plex.$DOMAIN:443
+      PLEX_CLAIM: $PLEX_CLAIM
+      PLEX_UID: $PUID
+      PLEX_GID: $PGID
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.plex.entrypoints=https
+      - traefik.http.routers.plex.rule=Host(`plex.$DOMAIN`)
+      - traefik.http.routers.plex.tls=true
+      - traefik.http.routers.plex.middlewares=chain-no-auth
+      - traefik.http.routers.plex.service=plex-svc
+      - traefik.http.services.plex-svc.loadbalancer.server.port=32400
+    ports:
+      - 32400:32400/tcp
+      - 32400:32400/udp
+      - 3500:3500/tcp
+      - 3500:3500/udp
+      - 8324:8324/tcp
+      - 324969:324969/tcp
+      - 32410:32410/udp
+      - 32411:32411/udp
+      - 32412:32412/udp
+      - 32413:32413/udp
+      - 32414:32414:/udp
+      # before uncomment disable jellyfin  
+      - 1900:1900/udp
+    devices:
+      # Intel acceleration hardware enable
+      - /srv/dri:/srv/dri
+      # for nvidia acceleration look in https://docs.linuxserver.io/images/docker-plex#nvidia
+    volumes:
+      - $DAPPDATA/plex/config:/config
+      - $DMEDIA/tv:/tv 
+      - $DMEDIA/movies:/movies
