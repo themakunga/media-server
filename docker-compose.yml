@@ -370,17 +370,17 @@ services:
       - 3500:3500/tcp
       - 3500:3500/udp
       - 8324:8324/tcp
-      - 324969:324969/tcp
+      - 32469:32469/tcp
       - 32410:32410/udp
       - 32411:32411/udp
       - 32412:32412/udp
       - 32413:32413/udp
-      - 32414:32414:/udp
+      - 32414:32414/udp
       # before uncomment disable jellyfin  
       - 1900:1900/udp
     devices:
       # Intel acceleration hardware enable
-      - /srv/dri:/srv/dri
+      - /dev/dri:/dev/dri
       # for nvidia acceleration look in https://docs.linuxserver.io/images/docker-plex#nvidia
     volumes:
       - $DAPPDATA/plex/config:/config
