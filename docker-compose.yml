@@ -127,6 +127,19 @@ services:
       - traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAIN 
       - traefik.http.routers.traefik-rtr.service=api@internal
       - traefik.http.routers.traefik-rtr.middlewares.chain-basic-auth@file 
+  watchtower:
+    <<: *common-keys-core
+    image: containrrr/watchtower
+    container_name: watchtower
+    environment:
+      <<: *default-tz-puid-pgid
+      WATCHTOWER_CLEANUP: $WATCHTOWER_CLEANUP
+      WATCHTOWER_INCLUDE_RESTARTING: $WATCHTOWER_INCLUDE_RESTARTING
+      WATCHTOWER_SCHEDULE: $WATCHTOWER_SCHEDULE
+      WATCHTOWER_ROLLING_RESTART: $WATCHTOWER_ROLLING_RESTART
+      WATCHTOWER_LOG_LEVEL: $LOG_LEVEL
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
   portainer:
     <<: *common-keys-core
     image: portainer/portainer-ce:latest
@@ -177,6 +190,22 @@ services:
       - traefik.http.routers.librespeed.middlewares=chain-basic-auth@file
       - traefik.http.routers.librespeed.service=librespeed-svc
       - traefik.http.services.librespeed-svc.loadbalancer.server.port=80
+  znc:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/znc:latest
+    container_name: znc
+    environment:
+      <<: *default-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/znc:/config
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.znc.entrypoints=https
+      - traefik.http.routers.znc.rule=Host(`znc.$DOMAIN`)
+      - traefik.http.routers.znc.tls=true
+      - traefik.http.routers.znc.middlewares=chain-no-auth@file
+      - traefik.http.routers.znc.service=znc-svc
+      - traefik.http.services.znc-svc.loadbalancer.server.port=6501
   thelounge:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/thelounge:latest
@@ -203,7 +232,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.jackett.entrypoints=https
-      - traefik.http.routers.jackett.rule=Host(`jackett.$DOMAIN`)
+      - traefik.http.routers.jackett.rule=Host(`jackett.$DOMAIN`, `trackers.$DOMAIN`)
       - traefik.http.routers.jackett.tls=true
       - traefik.http.routers.jackett.middlewares=chain-basic-auth@file
       - traefik.http.routers.jackett.service=jackett-svc
@@ -220,7 +249,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.sonarr.entrypoints=https
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.$DOMAIN`)
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.$DOMAIN`, `series.$DOMAIN`)
       - traefik.http.routers.sonarr.tls=true
       - traefik.http.routers.sonarr.middlewares=chain-basic-auth@file
       - traefik.http.routers.sonarr.service=sonarr-svc
@@ -228,7 +257,6 @@ services:
     volumes:
       - $DAPPDATA/sonarr:/config
       - $DMEDIA/tv:/tv
-      - $DMEDIA/movies:/movies
       - $DMEDIA/downloads:/downloads
   radarr:
     <<: *common-keys-apps
@@ -238,10 +266,76 @@ services:
       <<: *default-tz-puid-pgid
     labels:
       - traefik.enable=true
-      - traefik.http.routers.radarr.entryPoints.https
-      - traefik.http.routers.radarr.rule=Host(`radarr.$DOMAIN`)
+      - traefik.http.routers.radarr.entrypoints.https
+      - traefik.http.routers.radarr.rule=Host(`radarr.$DOMAIN`, `movies.$DOMAIN`)
       - traefik.http.routers.radarr.tls=true
       - traefik.http.routers.radarr.middlewares=chain-basic-auth@file
       - traefik.http.routers.radarr.service=radarr-svc
       - traefik.http.services.radarr-svc.loadbalancer.server.port=7878
-
+    volumes:
+      - $DAPPDATA/radarr:/config
+      - $DMEDIA/movies:/movies
+      - $DMEDIA/downloads:/downloads
+  bazarr:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bazarr.entrypoints=https
+      - traefik.http.routers.bazarr.rule=Host('subs.$DOMAIN')
+      - traefik.http.routers.bazarr.tls=true
+      - traefik.http.routers.bazarr.middlewares=chain-basic-auth@file
+      - traefik.http.routers.bazarr.service=bazarr-svc
+      - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767
+    volumes:
+      - $DAPPDATA/bazarr:/config
+      - $DMEDIA/tv:/tv 
+      - $DMEDIA/movies:/movies
+  jellyfin:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jellyfin.entrypoints=https
+      - traefik.http.routers.jellyfin.rule=Host(`jellyfin.$DOMAIN`)
+      - traefik.http.routers.jellyfin.tls=true
+      - traefik.http.routers.jellyfin.middlewares=chain-no-auth@file
+      - traefik.http.routers.jellyfin.service=jellyfin-svc
+      - traefik.http.services.jellyfin-svc.loadbalancer.server.port=8096
+    ports:
+      - 1900:1900/udp
+      - 7359:7359/udp
+    volumes:
+      - $DAPPDATA/jellyfin:/config
+      - $DMEDIA/movies:/movies
+      - $DMEDIA/tv:/tv
+    devices:
+      # INTEL ACCELERARION HARDWARE
+      - /dev/dri:/dev/dri
+  transmission:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/transmission:latest
+    container_name: transmission
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.transmission.entrypoints.https
+      - traefik.http.routers.transmission.rule=Host(`torrent.$DOMAIN`)
+      - traefik.http.routers.transmission.tls=true
+      - traefik.http.routers.transmission.middlewares=chain-basic-auth@file
+      - traefik.http.routers.transmission.service=transmission-svc
+      - traefik.http.services.transmission-svc.loadbalancer.server.port=9091
+    volumes:
+      - $DAPPDATA/transmission:/config
+      - $DMEDIA/downloads:/downloads
+      - $DSHARED/watch:/watch 
+    ports:
+      - 51413:51413
+      - 51413:51413/udp
