@@ -285,7 +285,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.bazarr.entrypoints=https
-      - traefik.http.routers.bazarr.rule=Host('subs.$DOMAIN')
+      - traefik.http.routers.bazarr.rule=Host(`subs.$DOMAIN`)
       - traefik.http.routers.bazarr.tls=true
       - traefik.http.routers.bazarr.middlewares=chain-basic-auth@file
       - traefik.http.routers.bazarr.service=bazarr-svc
@@ -361,7 +361,7 @@ services:
       - traefik.http.routers.plex.entrypoints=https
       - traefik.http.routers.plex.rule=Host(`plex.$DOMAIN`)
       - traefik.http.routers.plex.tls=true
-      - traefik.http.routers.plex.middlewares=chain-no-auth
+      - traefik.http.routers.plex.middlewares=chain-no-auth@file
       - traefik.http.routers.plex.service=plex-svc
       - traefik.http.services.plex-svc.loadbalancer.server.port=32400
     ports:
