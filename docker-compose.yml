@@ -369,7 +369,6 @@ services:
       - $DAPPDATA/plex/config:/config
       - $DMEDIA/tv:/tv 
       - $DMEDIA/movies:/movies
-      - $DSHARED/plex/transcoder:/
   prowlarr:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/prowlarr:latest
