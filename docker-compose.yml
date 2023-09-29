@@ -222,25 +222,7 @@ services:
       - traefik.http.services.thelounge-svc.loadbalancer.server.port=9000
     volumes:
       - $DAPPDATA/thelounge:/config
-  jackett:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/jackett:latest
-    container_name: jackett
-    environment:
-      <<: *default-tz-puid-pgid
-      AUTO_UPDATE: $JACKETT_AUTO_UPDATE
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.jackett.entrypoints=https
-      - traefik.http.routers.jackett.rule=Host(`jackett.$DOMAIN`, `trackers.$DOMAIN`)
-      - traefik.http.routers.jackett.tls=true
-      - traefik.http.routers.jackett.middlewares=chain-basic-auth@file
-      - traefik.http.routers.jackett.service=jackett-svc
-      - traefik.http.services.jackett-svc.loadbalancer.server.port=9117
-    volumes:
-      - $DAPPDATA/jackett:/config
-      - $DSHARED/blackhole:/downloads
-  sonarr:
+  sonarr:  
     <<: *common-keys-apps
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
@@ -356,6 +338,7 @@ services:
       PLEX_CLAIM: $PLEX_CLAIM
       PLEX_UID: $PUID
       PLEX_GID: $PGID
+      DOCKER_MODS: linuxserver/mods:plex-absolute-hama
     labels:
       - traefik.enable=true
       - traefik.http.routers.plex.entrypoints=https
@@ -386,3 +369,20 @@ services:
       - $DAPPDATA/plex/config:/config
       - $DMEDIA/tv:/tv 
       - $DMEDIA/movies:/movies
+      - $DSHARED/plex/transcoder:/
+  prowlarr:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prowlarr.entrypoints=https
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.$DOMAIN`, `indexers.$DOMAIN`)
+      - traefik.http.routers.prowlarr.tls=true
+      - traefik.http.routers.prowlarr.middlewares.chain-no-auth@file
+      - traefik.http.routers.prowlarr.service=prowlarr-svc
+      - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696
+    volumes:
+      - $DAPPDATA/prowlarr:/config
