@@ -28,6 +28,7 @@ x-common-keys-core: &common-keys-core
 x-common-keys-apps: &common-keys-apps
   networks:
     - proxy
+    - default
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
