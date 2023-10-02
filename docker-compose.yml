@@ -54,6 +54,14 @@ services:
     image: pihole/pihole:latest
     environment:
       <<: *default-tz-puid-pgid
+      WEBPASSWORD: $PIHOLE_WEBPASSWORD
+      DNSMASQ_LISTENING: $PIHOLE_DNSMASQ_LISTENING
+      VIRUTAL_HOST: $PIHOLE_VIRTUAL_HOST
+      PROXY_LOCATION: $PIHOLE_PROXY_LOCATION
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    hostname: $DOMAIN
     ports:
       - 53:53/tcp
       - 53:53/udp
@@ -68,6 +76,8 @@ services:
     volumes:
       - $DAPPDATA/pihole:/etc/pihole
       - $DSHARED/dnsmasq.d:/etc/dnsmasq.d
+      - $DLOGS/pihole/pihole.log:/var/log/pihole.log
+
   traefik:
     <<: *common-keys-core
     container_name: traefik
