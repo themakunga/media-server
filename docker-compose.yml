@@ -76,7 +76,7 @@ services:
     volumes:
       - $DAPPDATA/pihole:/etc/pihole
       - $DSHARED/dnsmasq.d:/etc/dnsmasq.d
-      - $DLOGS/pihole/pihole.log:/var/log/pihole.log
+      - $DLOGS/pihole:/var/log
 
   traefik:
     <<: *common-keys-core
