@@ -18,6 +18,12 @@ x-environment: &default-tz-puid-pgid
   PUID: $PUID
   PGID: $PGID
 
+x-environment-umask: &umask-tz-puid-pgid
+  TZ: $TZ 
+  PUID: $PUID
+  PGID: $PGID
+  UMASK: $UMASK
+
 x-common-keys-core: &common-keys-core
   networks:
     - proxy
@@ -42,6 +48,26 @@ x-common-keys-media: &common-keys-media
 
 ############################ SERVICES ###############################
 services:
+  pihole:
+    <<: *common-keys-core
+    container_name: pihole
+    image: pihole/pihole:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    ports:
+      - 53:53/tcp
+      - 53:53/udp
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pihole.entrypoints=https
+      - traefik.http.routers.pihole.rule=Host(`pihole.$DOMAIN`)
+      - traefik.http.routers.pihole.tls=true
+      - traefik.http.routers.pihole.middlewares=chain-basic-auth@file 
+      - traefik.http.routers.pihole.service=pihole-svc
+      - traefik.http.services.pihole-svc.loadbalancer.server.port=80 
+    volumes:
+      - $DAPPDATA/pihole:/etc/pihole
+      - $DSHARED/dnsmasq.d:/etc/dnsmasq.d
   traefik:
     <<: *common-keys-core
     container_name: traefik
@@ -228,7 +254,7 @@ services:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *umask-tz-puid-pgid
     labels:
       - traefik.enable=true
       - traefik.http.routers.sonarr.entrypoints=https
@@ -246,7 +272,7 @@ services:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *umask-tz-puid-pgid
     labels:
       - traefik.enable=true
       - traefik.http.routers.radarr.entrypoints.https
@@ -264,7 +290,7 @@ services:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *umask-tz-puid-pgid
     labels:
       - traefik.enable=true
       - traefik.http.routers.bazarr.entrypoints=https
@@ -307,7 +333,7 @@ services:
     image: lscr.io/linuxserver/transmission:latest
     container_name: transmission
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *umask-tz-puid-pgid
     labels:
       - traefik.enable=true
       - traefik.http.routers.transmission.entrypoints.https
@@ -333,7 +359,7 @@ services:
     #  dockerfile: ./amd.Dockerfile
     container_name: plex
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *umask-tz-puid-pgid
       VERSION: docker
       ADVERTISE_IP: https://plex.$DOMAIN:443
       PLEX_CLAIM: $PLEX_CLAIM
@@ -375,7 +401,7 @@ services:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     environment:
-      <<: *default-tz-puid-pgid
+      <<: *umask-tz-puid-pgid
     labels:
       - traefik.enable=true
       - traefik.http.routers.prowlarr.entrypoints=https
