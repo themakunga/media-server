@@ -369,7 +369,7 @@ services:
     image: lscr.io/linuxserver/plex:latest
     # uncomment if you use amd acceleration
     # build:
-    #   context: $DAPPDATA/plex/build
+    #   context: $DSCRIPT/plex
     #  dockerfile: ./amd.Dockerfile
     container_name: plex
     environment:
