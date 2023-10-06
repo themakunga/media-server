@@ -34,7 +34,6 @@ x-common-keys-core: &common-keys-core
 x-common-keys-apps: &common-keys-apps
   networks:
     - proxy
-    - default
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
@@ -48,36 +47,41 @@ x-common-keys-media: &common-keys-media
 
 ############################ SERVICES ###############################
 services:
-  pihole:
+  # pihole:
+  #   <<: *common-keys-core
+  #   container_name: pihole
+  #   image: pihole/pihole:latest
+  #   environment:
+  #     <<: *default-tz-puid-pgid
+  #     WEBPASSWORD: $PIHOLE_WEBPASSWORD
+  #   hostname: $DOMAIN
+  #   ports:
+  #     - 53:53/tcp
+  #     - 53:53/udp
+  #   labels:
+  #     - traefik.enable=true
+  #     - traefik.http.routers.pihole.entrypoints=https
+  #     - traefik.http.routers.pihole.rule=Host(`pihole.$DOMAIN`)
+  #     - traefik.http.routers.pihole.tls=true
+  #     - traefik.http.routers.pihole.middlewares=chain-basic-auth@file 
+  #     - traefik.http.routers.pihole.service=pihole-svc
+  #     - traefik.http.services.pihole-svc.loadbalancer.server.port=80 
+  #   volumes:
+  #     - $DAPPDATA/pihole:/etc/pihole
+  #     - $DSHARED/dnsmasq.d:/etc/dnsmasq.d
+  #     - $DLOGS/pihole:/var/log
+  #
+  dnsmasq:
     <<: *common-keys-core
-    container_name: pihole
-    image: pihole/pihole:latest
-    environment:
-      <<: *default-tz-puid-pgid
-      WEBPASSWORD: $PIHOLE_WEBPASSWORD
-      DNSMASQ_LISTENING: $PIHOLE_DNSMASQ_LISTENING
-      VIRUTAL_HOST: $PIHOLE_VIRTUAL_HOST
-      PROXY_LOCATION: $PIHOLE_PROXY_LOCATION
-    dns:
-      - 127.0.0.1
-      - 1.1.1.1
-    hostname: $DOMAIN
-    ports:
-      - 53:53/tcp
-      - 53:53/udp
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.pihole.entrypoints=https
-      - traefik.http.routers.pihole.rule=Host(`pihole.$DOMAIN`)
-      - traefik.http.routers.pihole.tls=true
-      - traefik.http.routers.pihole.middlewares=chain-basic-auth@file 
-      - traefik.http.routers.pihole.service=pihole-svc
-      - traefik.http.services.pihole-svc.loadbalancer.server.port=80 
+    container_name: dnsmasq
+    image: strm/dnsmasq
     volumes:
-      - $DAPPDATA/pihole:/etc/pihole
-      - $DSHARED/dnsmasq.d:/etc/dnsmasq.d
-      - $DLOGS/pihole:/var/log
-
+      - $DSHARED/dnsmasq.d/dnsmasq.conf:/etc/dnsmasq.conf:ro 
+    ports:
+      - 53:53/udp
+      - 53:53/tcp
+    cap_add:
+        - NET_ADMIN
   traefik:
     <<: *common-keys-core
     container_name: traefik
@@ -204,13 +208,13 @@ services:
     volumes:
       - $DAPPDATA/heimdall:/config
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.heimdall.entrypoints=https
-      - traefik.http.routers.heimdall.rule=Host(`$DOMAIN`, `www.$DOMAIN`)
-      - traefik.http.routers.heimdall.tls=true
-      - traefik.http.routers.heimdall.middlewares=chain-basic-auth@file 
-      - traefik.http.routers.heimdall.service=heimdall-svc
-      - traefik.http.services.heimdall-svc.loadbalancer.server.port=80
+      traefik.enable: true
+      traefik.http.routers.heimdall.entrypoints: https
+      traefik.http.routers.heimdall.rule: Host(`$DOMAIN`, `www.$DOMAIN`)
+      traefik.http.routers.heimdall.tls: true
+      traefik.http.routers.heimdall.middlewares: chain-basic-auth@file 
+      traefik.http.routers.heimdall.service: heimdall-svc
+      traefik.http.services.heimdall-svc.loadbalancer.server.port: 80
   librespeed:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/librespeed:latest
@@ -220,13 +224,13 @@ services:
     volumes:
       - $DAPPDATA/librespeed:/config
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.librespeed.entrypoints=https
-      - traefik.http.routers.librespeed.rule=Host(`speed.$DOMAIN`)
-      - traefik.http.routers.librespeed.tls=true
-      - traefik.http.routers.librespeed.middlewares=chain-basic-auth@file
-      - traefik.http.routers.librespeed.service=librespeed-svc
-      - traefik.http.services.librespeed-svc.loadbalancer.server.port=80
+      traefik.enable: true
+      traefik.http.routers.librespeed.entrypoints: https
+      traefik.http.routers.librespeed.rule: Host(`speed.$DOMAIN`)
+      traefik.http.routers.librespeed.tls: true
+      traefik.http.routers.librespeed.middlewares: chain-basic-auth@file
+      traefik.http.routers.librespeed.service: librespeed-svc
+      traefik.http.services.librespeed-svc.loadbalancer.server.port: 80
   znc:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/znc:latest
@@ -236,13 +240,13 @@ services:
     volumes:
       - $DAPPDATA/znc:/config
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.znc.entrypoints=https
-      - traefik.http.routers.znc.rule=Host(`znc.$DOMAIN`)
-      - traefik.http.routers.znc.tls=true
-      - traefik.http.routers.znc.middlewares=chain-no-auth@file
-      - traefik.http.routers.znc.service=znc-svc
-      - traefik.http.services.znc-svc.loadbalancer.server.port=6501
+      traefik.enable: true
+      traefik.http.routers.znc.entrypoints: https
+      traefik.http.routers.znc.rule: Host(`znc.$DOMAIN`)
+      traefik.http.routers.znc.tls: true
+      traefik.http.routers.znc.middlewares: chain-no-auth@file
+      traefik.http.routers.znc.service: znc-svc
+      traefik.http.services.znc-svc.loadbalancer.server.port: 6501
   thelounge:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/thelounge:latest
@@ -250,13 +254,13 @@ services:
     environment:
       <<: *default-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.thelounge.entrypoints=https
-      - traefik.http.routers.thelounge.rule=Host(`irc.$DOMAIN`)
-      - traefik.http.routers.thelounge.tls=true
-      - traefik.http.routers.thelounge.middlewares=chain-basic-auth@file
-      - traefik.http.routers.thelounge.service=thelounge-svc
-      - traefik.http.services.thelounge-svc.loadbalancer.server.port=9000
+      traefik.enable: true
+      traefik.http.routers.thelounge.entrypoints: https
+      traefik.http.routers.thelounge.rule: Host(`irc.$DOMAIN`)
+      traefik.http.routers.thelounge.tls: true
+      traefik.http.routers.thelounge.middlewares: chain-basic-auth@file
+      traefik.http.routers.thelounge.service: thelounge-svc
+      traefik.http.services.thelounge-svc.loadbalancer.server.port: 9000
     volumes:
       - $DAPPDATA/thelounge:/config
   sonarr:  
@@ -266,13 +270,13 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.sonarr.entrypoints=https
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.$DOMAIN`, `series.$DOMAIN`)
-      - traefik.http.routers.sonarr.tls=true
-      - traefik.http.routers.sonarr.middlewares=chain-basic-auth@file
-      - traefik.http.routers.sonarr.service=sonarr-svc
-      - traefik.http.services.sonarr-svc.loadbalancer.server.port=8989
+      traefik.enable: true
+      traefik.http.routers.sonarr.entrypoints: https
+      traefik.http.routers.sonarr.rule: Host(`sonarr.$DOMAIN`, `series.$DOMAIN`)
+      traefik.http.routers.sonarr.tls: true
+      traefik.http.routers.sonarr.middlewares: chain-basic-auth@file
+      traefik.http.routers.sonarr.service: sonarr-svc
+      traefik.http.services.sonarr-svc.loadbalancer.server.port: 8989
     volumes:
       - $DAPPDATA/sonarr:/config
       - $DMEDIA/tv:/tv
@@ -284,13 +288,13 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.radarr.entrypoints.https
-      - traefik.http.routers.radarr.rule=Host(`radarr.$DOMAIN`, `movies.$DOMAIN`)
-      - traefik.http.routers.radarr.tls=true
-      - traefik.http.routers.radarr.middlewares=chain-basic-auth@file
-      - traefik.http.routers.radarr.service=radarr-svc
-      - traefik.http.services.radarr-svc.loadbalancer.server.port=7878
+      traefik.enable: true
+      traefik.http.routers.radarr.entrypoints: https
+      traefik.http.routers.radarr.rule: Host(`radarr.$DOMAIN`, `movies.$DOMAIN`)
+      traefik.http.routers.radarr.tls: true
+      traefik.http.routers.radarr.middlewares: chain-basic-auth@file
+      traefik.http.routers.radarr.service: radarr-svc
+      traefik.http.services.radarr-svc.loadbalancer.server.port: 7878
     volumes:
       - $DAPPDATA/radarr:/config
       - $DMEDIA/movies:/movies
@@ -302,13 +306,13 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.bazarr.entrypoints=https
-      - traefik.http.routers.bazarr.rule=Host(`subs.$DOMAIN`)
-      - traefik.http.routers.bazarr.tls=true
-      - traefik.http.routers.bazarr.middlewares=chain-basic-auth@file
-      - traefik.http.routers.bazarr.service=bazarr-svc
-      - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767
+      traefik.enable: true
+      traefik.http.routers.bazarr.entrypoints: https
+      traefik.http.routers.bazarr.rule: Host(`subs.$DOMAIN`)
+      traefik.http.routers.bazarr.tls: true
+      traefik.http.routers.bazarr.middlewares: chain-basic-auth@file
+      traefik.http.routers.bazarr.service: bazarr-svc
+      traefik.http.services.bazarr-svc.loadbalancer.server.port: 6767
     volumes:
       - $DAPPDATA/bazarr:/config
       - $DMEDIA/tv:/tv 
@@ -321,13 +325,13 @@ services:
     #  environment:
 #    <<: *default-tz-puid-pgid
     #    labels:
-      # - traefik.enable=true
-      #- traefik.http.routers.jellyfin.entrypoints=https
-      #- traefik.http.routers.jellyfin.rule=Host(`jellyfin.$DOMAIN`)
-      #- traefik.http.routers.jellyfin.tls=true
-      #- traefik.http.routers.jellyfin.middlewares=chain-no-auth@file
-      #- traefik.http.routers.jellyfin.service=jellyfin-svc
-      #- traefik.http.services.jellyfin-svc.loadbalancer.server.port=8096
+      # traefik.enable=true
+      # traefik.http.routers.jellyfin.entrypoints: https
+      # traefik.http.routers.jellyfin.rule: Host(`jellyfin.$DOMAIN`)
+      # traefik.http.routers.jellyfin.tls: true
+      # traefik.http.routers.jellyfin.middlewares: chain-no-auth@file
+      # traefik.http.routers.jellyfin.service: jellyfin-svc
+      # traefik.http.services.jellyfin-svc.loadbalancer.server.port: 8096
     #ports:
       #- 1900:1900/udp
       #- 7359:7359/udp
@@ -345,13 +349,13 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.transmission.entrypoints.https
-      - traefik.http.routers.transmission.rule=Host(`torrent.$DOMAIN`)
-      - traefik.http.routers.transmission.tls=true
-      - traefik.http.routers.transmission.middlewares=chain-basic-auth@file
-      - traefik.http.routers.transmission.service=transmission-svc
-      - traefik.http.services.transmission-svc.loadbalancer.server.port=9091
+      traefik.enable: true
+      traefik.http.routers.transmission.entrypoints: https
+      traefik.http.routers.transmission.rule: Host(`torrent.$DOMAIN`)
+      traefik.http.routers.transmission.tls: true
+      traefik.http.routers.transmission.middlewares: chain-basic-auth@file
+      traefik.http.routers.transmission.service: transmission-svc
+      traefik.http.services.transmission-svc.loadbalancer.server.port: 9091
     volumes:
       - $DAPPDATA/transmission:/config
       - $DMEDIA/downloads:/downloads
@@ -371,19 +375,17 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
       VERSION: docker
-      ADVERTISE_IP: https://plex.$DOMAIN:443
       PLEX_CLAIM: $PLEX_CLAIM
       PLEX_UID: $PUID
       PLEX_GID: $PGID
-      DOCKER_MODS: linuxserver/mods:plex-absolute-hama
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.plex.entrypoints=https
-      - traefik.http.routers.plex.rule=Host(`plex.$DOMAIN`)
-      - traefik.http.routers.plex.tls=true
-      - traefik.http.routers.plex.middlewares=chain-no-auth@file
-      - traefik.http.routers.plex.service=plex-svc
-      - traefik.http.services.plex-svc.loadbalancer.server.port=32400
+      traefik.enable: true
+      traefik.http.routers.plex.entrypoints: https
+      traefik.http.routers.plex.rule: Host(`plex.$DOMAIN`)
+      traefik.http.routers.plex.tls: true
+      traefik.http.routers.plex.middlewares: chain-no-auth@file
+      traefik.http.routers.plex.service: plex-svc
+      traefik.http.services.plex-svc.loadbalancer.server.port: 32400
     ports:
       - 32400:32400/tcp
       - 32400:32400/udp
@@ -413,12 +415,30 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.prowlarr.entrypoints=https
-      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.$DOMAIN`, `indexers.$DOMAIN`)
-      - traefik.http.routers.prowlarr.tls=true
-      - traefik.http.routers.prowlarr.middlewares.chain-no-auth@file
-      - traefik.http.routers.prowlarr.service=prowlarr-svc
-      - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696
+      traefik.enable: true
+      traefik.http.routers.prowlarr.entrypoints: https
+      traefik.http.routers.prowlarr.rule: Host(`prowlarr.$DOMAIN`, `indexers.$DOMAIN`)
+      traefik.http.routers.prowlarr.tls: true
+      traefik.http.routers.prowlarr.middlewares: chain-no-auth@file
+      traefik.http.routers.prowlarr.service: prowlarr-svc
+      traefik.http.services.prowlarr-svc.loadbalancer.server.port: 9696
     volumes:
       - $DAPPDATA/prowlarr:/config
+  filebrowser:
+    <<: *common-keys-apps
+    image: hurlenko/filebrowser:latest
+    container_name: filebrowser
+    environment:
+      <<: *default-tz-puid-pgid
+    user: $PUID:$PGID
+    volumes:
+      - $DMEDIA:/data
+      - $DAPPDATA/filebrowser:/config
+    labels:
+      traefik.enable: true
+      traefik.http.routers.filebrowser.entryPoints: https
+      traefik.http.routers.filebrowser.rule: Host(`files.$DOMAIN`)
+      traefik.http.routers.filebrowser.tls: true
+      traefik.http.routers.filebrowser.middlewares: chain-no-auth@file
+      traefik.http.routers.filebrowser.service: filebrowser-svc
+      traefik.http.services.filebrowser-svc.loadbalancer.server.port: 8080
