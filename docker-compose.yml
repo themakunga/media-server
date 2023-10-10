@@ -74,14 +74,24 @@ services:
   dnsmasq:
     <<: *common-keys-core
     container_name: dnsmasq
-    image: strm/dnsmasq
+    image: jpillora/dnsmasq
     volumes:
       - $DSHARED/dnsmasq.d/dnsmasq.conf:/etc/dnsmasq.conf:ro 
     ports:
       - 53:53/udp
       - 53:53/tcp
-    cap_add:
-        - NET_ADMIN
+    environment:
+      <<: *default-tz-puid-pgid
+      HTTP_USER: $DNSMASQ_USER
+      HTTP_PASS: $DNSMASQ_PASS
+    labels:
+      traefik.enable: true
+      traefik.http.routers.dnsmasq.entrypoints: https
+      traefik.http.routers.dnsmasq.rules: Host(`dns.$DOMAIN`)
+      traefik.http.routers.dnsmasq.tls: true
+      traefik.http.routers.dnsmasq.middlewares: chain-no-auth@file
+      traefik.http.routers.dnsmasq.service: dnsmasq-svc
+      traefik.http.services.dnsmasq-svc.loadbalancer.server.port: 5380
   traefik:
     <<: *common-keys-core
     container_name: traefik
@@ -99,7 +109,7 @@ services:
       - --entrypoints.https.forwardedHeaders.trustedIPs=$CLOUDFLARE_IPS,$LOCAL_IPS
       - --entryPoints.traefik.address=:8080
       - --api=true
-      - --api.insecure=true
+      -   --api.insecure=true
       - --api.dashboard=true
       # - --serversTransport.insecureSkipVerify=true
       - --log=true
@@ -239,6 +249,8 @@ services:
       <<: *default-tz-puid-pgid
     volumes:
       - $DAPPDATA/znc:/config
+    ports:
+      - 6501:6501
     labels:
       traefik.enable: true
       traefik.http.routers.znc.entrypoints: https
