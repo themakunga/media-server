@@ -76,7 +76,14 @@ services:
     container_name: dnsmasq
     image: jpillora/dnsmasq
     volumes:
-      - $DSHARED/dnsmasq.d/dnsmasq.conf:/etc/dnsmasq.conf:ro 
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $DSHARED/dnsmasq.conf:/etc/dnsmasq.conf:ro 
+      - $DSHARED/dnsmasq.d:/etc/dnsmasq.d:rw
+    logging:
+      options:
+        max-size: 100m
+    cap_add:
+        - NET_ADMIN
     ports:
       - 53:53/udp
       - 53:53/tcp
@@ -87,11 +94,12 @@ services:
     labels:
       traefik.enable: true
       traefik.http.routers.dnsmasq.entrypoints: https
-      traefik.http.routers.dnsmasq.rules: Host(`dns.$DOMAIN`)
+      traefik.http.routers.dnsmasq.rule: Host(`dns.$DOMAIN`)
       traefik.http.routers.dnsmasq.tls: true
       traefik.http.routers.dnsmasq.middlewares: chain-no-auth@file
       traefik.http.routers.dnsmasq.service: dnsmasq-svc
       traefik.http.services.dnsmasq-svc.loadbalancer.server.port: 5380
+
   traefik:
     <<: *common-keys-core
     container_name: traefik
@@ -164,20 +172,44 @@ services:
       - CF_API_KEY=$CLOUDFLARE_API_KEY
       - DOMAIN=$DOMAIN
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.http-catch-all.entrypoints=https
-      - traefik.http.routers.http-catch-all.rule=HostRegexp(`{host:.+}`)
-      - traefik.http.routers.http-catch-all.middlewares=redirect-to-https
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      traefik.enable: true
+      traefik.http.routers.http-catch-all.entrypoints: https
+      traefik.http.routers.http-catch-all.rule: HostRegexp(`{host:.+}`)
+      traefik.http.routers.http-catch-all.middlewares: redirect-to-https
+      traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: https
       # HTTP routers
-      - traefik.http.routers.traefik-rtr.entrypoints=https
-      - traefik.http.routers.traefik-rtr.rule=Host(`traefik.$DOMAIN`)
-      - traefik.http.routers.traefik-rtr.tls=true
-      - traefik.http.routers.traefik-rtr.tls.certresolver=dns-cloudflare
-      - traefik.http.routers.traefik-rtr.tls.domains[0].main=$DOMAIN
-      - traefik.http.routers.traefik-rtr.tls.domains[0].sans=*.$DOMAIN 
-      - traefik.http.routers.traefik-rtr.service=api@internal
-      - traefik.http.routers.traefik-rtr.middlewares.chain-basic-auth@file 
+      traefik.http.routers.traefik-rtr.entrypoints: https
+      traefik.http.routers.traefik-rtr.rule: Host(`traefik.$DOMAIN`)
+      traefik.http.routers.traefik-rtr.tls: true
+      traefik.http.routers.traefik-rtr.tls.certresolver: dns-cloudflare
+      traefik.http.routers.traefik-rtr.tls.domains[0].main: $DOMAIN
+      traefik.http.routers.traefik-rtr.tls.domains[0].sans: str!! *.$DOMAIN 
+      traefik.http.routers.traefik-rtr.service: api@internal
+      traefik.http.routers.traefik-rtr.middlewares: chain-basic-auth@file 
+  homeassistant:
+    <<: *common-keys-core
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    volumes:
+      - $DAPPDATA/homeassitant:/config:rw
+      - /etc/localtime:/etc/localtime:ro 
+    environment:
+      <<: *umask-tz-puid-pgid
+    dns:
+      - 192.168.4.45
+      - 8.8.8.8 # DISABLE_JEMALLOC: true
+    ports:
+      - 8123:8123
+    privileged: true
+    labels:
+      traefik.enable: true
+      traefik.http.routers.homeassistant.entrypoints: https
+      traefik.http.routers.homeassistant.rule: Host(`home.$DOMAIN`)
+      traefik.http.routers.homeassistant.tls: true
+      traefik.http.routers.homeassistant.middlewares: chain-no-auth@file
+      traefik.http.routers.homeassistant.service: homeassistant-svc
+      traefik.http.services.homeassistant-svc.loadbalancer.server.port: 8123
+
   watchtower:
     <<: *common-keys-core
     image: containrrr/watchtower
@@ -202,13 +234,13 @@ services:
     environment:
       <<: *default-tz-puid-pgid
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.portainer.entrypoints=https
-      - traefik.http.routers.portainer.rule=Host(`portainer.$DOMAIN`)
-      - traefik.http.routers.portainer.tls=true
-      - traefik.http.routers.portainer.middlewares=chain-no-auth@file
-      - traefik.http.routers.portainer.service=portainer-svc
-      - traefik.http.services.portainer-svc.loadbalancer.server.port=9000
+      traefik.enable: true
+      traefik.http.routers.portainer.entrypoints: https
+      traefik.http.routers.portainer.rule: Host(`portainer.$DOMAIN`)
+      traefik.http.routers.portainer.tls: true
+      traefik.http.routers.portainer.middlewares: chain-no-auth@file
+      traefik.http.routers.portainer.service: portainer-svc
+      traefik.http.services.portainer-svc.loadbalancer.server.port: 9000
   # heimdall:
   #   <<: *common-keys-apps
   #   image: lscr.io/linuxserver/heimdall:latest
@@ -257,6 +289,24 @@ services:
       traefik.http.routers.librespeed.service: librespeed-svc
       traefik.http.services.librespeed-svc.loadbalancer.server.port: 80
 
+  nodered:
+    <<: *common-keys-core
+    image: nodered/node-red:latest
+    container_name: node-red
+    environment:
+      <<: *default-tz-puid-pgid
+    ports:
+      - 1880:1880
+    volumes:
+      - $DAPPDATA/nodered:/data
+    labels:
+      traefik.enable: true
+      traefik.http.routers.nodered.entrypoints: https
+      traefik.http.routers.nodered.rule: Host(`red.$DOMAIN`)
+      traefik.http.routers.nodered.tls: true
+      traefik.http.routers.nodered.middlewares: chain-basic-auth@file
+      traefik.http.routers.nodered.service: nodered-svc
+      traefik.http.services.nodered-svc.loadbalancer.server.port: 1880
   znc:
     <<: *common-keys-apps
     image: znc
@@ -267,6 +317,10 @@ services:
       - $DAPPDATA/znc:/znc-data:rw
     ports:
       - 6501:6501
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4 
+      - 1.1.1.1
     labels:
       traefik.enable: true
       traefik.http.routers.znc.entrypoints: https
@@ -346,31 +400,30 @@ services:
       - $DAPPDATA/bazarr:/config
       - $DMEDIA/tv:/tv 
       - $DMEDIA/movies:/movies
-  # jellyfin:
-  #  <<: *common-keys-apps
-  #  image: lscr.io/linuxserver/jellyfin:latest
-  
-  #  container_name: jellyfin
-    #  environment:
-#    <<: *default-tz-puid-pgid
-    #    labels:
-      # traefik.enable=true
-      # traefik.http.routers.jellyfin.entrypoints: https
-      # traefik.http.routers.jellyfin.rule: Host(`jellyfin.$DOMAIN`)
-      # traefik.http.routers.jellyfin.tls: true
-      # traefik.http.routers.jellyfin.middlewares: chain-no-auth@file
-      # traefik.http.routers.jellyfin.service: jellyfin-svc
-      # traefik.http.services.jellyfin-svc.loadbalancer.server.port: 8096
-    #ports:
-      #- 1900:1900/udp
-      #- 7359:7359/udp
-    #volumes:
-      # - $DAPPDATA/jellyfin:/config
-      #- $DMEDIA/movies:/movies
-      #- $DMEDIA/tv:/tv
-    #devices:
+  jellyfin:
+    <<: *common-keys-apps
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      <<: *default-tz-puid-pgid
+    labels:
+      traefik.enable: true
+      traefik.http.routers.jellyfin.entrypoints: https
+      traefik.http.routers.jellyfin.rule: Host(`jellyfin.$DOMAIN`)
+      traefik.http.routers.jellyfin.tls: true
+      traefik.http.routers.jellyfin.middlewares: chain-no-auth@file
+      traefik.http.routers.jellyfin.service: jellyfin-svc
+      traefik.http.services.jellyfin-svc.loadbalancer.server.port: 8096
+    ports:
+      - 1900:1900/udp
+      - 7359:7359/udp
+    volumes:
+      - $DAPPDATA/jellyfin:/config
+      - $DMEDIA/movies:/movies
+      - $DMEDIA/tv:/tv
+    devices:
       # INTEL ACCELERARION HARDWARE
-      # - /dev/dri:/dev/dri
+      - /dev/dri:/dev/dri
   transmission:
     <<: *common-keys-apps
     image: lscr.io/linuxserver/transmission:latest
@@ -428,7 +481,7 @@ services:
       - 32413:32413/udp
       - 32414:32414/udp
       # before uncomment disable jellyfin  
-      - 1900:1900/udp
+      # - 1900:1900/udp
     devices:
       # Intel acceleration hardware enable
       - /dev/dri:/dev/dri

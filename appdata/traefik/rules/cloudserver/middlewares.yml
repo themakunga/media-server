@@ -25,7 +25,7 @@ http:
         stsIncludeSubdomains: true
         stsPreload: true
         forceSTSHeader: true
-        customFrameOptionsValue: "allow-from https:{{env "DOMAINNAME_CLOUD_SERVER"}}"
+        customFrameOptionsValue: "allow-from https:{{env "DOMAIN"}}"
         contentTypeNosniff: true
         browserXssFilter: true
         referrerPolicy: same-origin
