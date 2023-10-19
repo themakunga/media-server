@@ -31,12 +31,24 @@ x-common-keys-core: &common-keys-core
     - no-new-privileges:true
   restart: always
 
+x-common-keys-core-no-dns: &common-keys-core-no-dns
+  networks:
+    - proxy
+  security_opt:
+   - no-new-privileges:true
+  restart: always
+
 x-common-keys-apps: &common-keys-apps
   networks:
     - proxy
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
+  dns:
+    - 192.168.4.45
+    - 8.8.8.8
+    - 8.8.4.4 
+    - 1.1.1.1 
 
 x-common-keys-media: &common-keys-media
   networks:
@@ -64,7 +76,7 @@ services:
   #     - traefik.http.routers.pihole.rule=Host(`pihole.$DOMAIN`)
   #     - traefik.http.routers.pihole.tls=true
   #     - traefik.http.routers.pihole.middlewares=chain-basic-auth@file 
-  #     - traefik.http.routers.pihole.service=pihole-svc
+  #     - traefik.http.routers.p2ihole.service=pihole-svc
   #     - traefik.http.services.pihole-svc.loadbalancer.server.port=80 
   #   volumes:
   #     - $DAPPDATA/pihole:/etc/pihole
@@ -72,7 +84,7 @@ services:
   #     - $DLOGS/pihole:/var/log
   #
   dnsmasq:
-    <<: *common-keys-core
+    <<: *common-keys-core-no-dns
     container_name: dnsmasq
     image: jpillora/dnsmasq
     volumes:
@@ -187,20 +199,33 @@ services:
       traefik.http.routers.traefik-rtr.service: api@internal
       traefik.http.routers.traefik-rtr.middlewares: chain-basic-auth@file 
   homeassistant:
-    <<: *common-keys-core
+    <<: *common-keys-apps
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: homeassistant
     volumes:
       - $DAPPDATA/homeassitant:/config:rw
       - /etc/localtime:/etc/localtime:ro 
+      - /run/dbus:/run/dbus:ro  
     environment:
       <<: *umask-tz-puid-pgid
-    dns:
-      - 192.168.4.45
-      - 8.8.8.8 # DISABLE_JEMALLOC: true
+      HC_IGNORE_SSL: true
+      # DISABLE_JEMALLOC: true
     ports:
       - 8123:8123
     privileged: true
+    healthcheck:
+      test:
+        - CMD 
+        - curl 
+        - -f
+        - http://192.168.4.45:8123
+      interval: 30s 
+      timeout: 10s 
+      retries: 6 
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+      - SYS_ADMIN
     labels:
       traefik.enable: true
       traefik.http.routers.homeassistant.entrypoints: https
@@ -211,7 +236,7 @@ services:
       traefik.http.services.homeassistant-svc.loadbalancer.server.port: 8123
 
   watchtower:
-    <<: *common-keys-core
+    <<: *common-keys-apps
     image: containrrr/watchtower
     container_name: watchtower
     environment:
@@ -224,7 +249,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
   portainer:
-    <<: *common-keys-core
+    <<: *common-keys-apps
     image: portainer/portainer-ce:latest
     container_name: portainer
     command: -H unix:///var/run/docker.sock
@@ -258,7 +283,7 @@ services:
   #     traefik.http.routers.heimdall.service: heimdall-svc
   #     traefik.http.services.heimdall-svc.loadbalancer.server.port: 80
   homarr:
-    <<: *common-keys-core
+    <<: *common-keys-apps
     image: ghcr.io/ajnart/homarr:latest
     container_name: homarr
     volumes:
@@ -290,7 +315,7 @@ services:
       traefik.http.services.librespeed-svc.loadbalancer.server.port: 80
 
   nodered:
-    <<: *common-keys-core
+    <<: *common-keys-apps
     image: nodered/node-red:latest
     container_name: node-red
     environment:
@@ -317,10 +342,6 @@ services:
       - $DAPPDATA/znc:/znc-data:rw
     ports:
       - 6501:6501
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4 
-      - 1.1.1.1
     labels:
       traefik.enable: true
       traefik.http.routers.znc.entrypoints: https
@@ -524,3 +545,17 @@ services:
       traefik.http.routers.filebrowser.middlewares: chain-no-auth@file
       traefik.http.routers.filebrowser.service: filebrowser-svc
       traefik.http.services.filebrowser-svc.loadbalancer.server.port: 8080
+  
+  mariadb:
+    <<: *common-keys-apps
+    image: mariadb:latest
+    container_name: mariadb
+    environment:
+      <<: *default-tz-puid-pgid
+      MYSQL_ROOT_PASSWORD: $MARIADB_PASSWORD
+    volumes:
+      - $DAPPDATA/mariadb:/var/lib/mysql 
+    ports:
+      - 3306:3306
+
+    
