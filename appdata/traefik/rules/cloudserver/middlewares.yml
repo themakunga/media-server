@@ -18,6 +18,9 @@ http:
           - GET
           - OPTIONS
           - PUT
+          - POST
+        customrequestheaders:
+          X-Forwarded-Proto: https
         accessControlMaxAge: 100
         hostsProxyHeaders:
           - X-Forwarded-Host
@@ -25,7 +28,7 @@ http:
         stsIncludeSubdomains: true
         stsPreload: true
         forceSTSHeader: true
-        customFrameOptionsValue: "allow-from https:{{env "DOMAIN"}}"
+        customFrameOptionsValue: 'allow-from https:{{env "DOMAIN"}}'
         contentTypeNosniff: true
         browserXssFilter: true
         referrerPolicy: same-origin
