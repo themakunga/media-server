@@ -13,15 +13,21 @@ networks:
 
 ########################## EXTENSION FIELDS ########################
 
+x-dns: &dns-core
+  dns:
+    - 192.168.4.45
+    - 8.8.8.8
+    - 8.8.4.4 
+    - 1.1.1.1 
+    - 1.0.0.1
+          
 x-environment: &default-tz-puid-pgid
   TZ: $TZ
   PUID: $PUID
   PGID: $PGID
 
 x-environment-umask: &umask-tz-puid-pgid
-  TZ: $TZ 
-  PUID: $PUID
-  PGID: $PGID
+  <<: *default-tz-puid-pgid
   UMASK: $UMASK
 
 x-common-keys-core: &common-keys-core
@@ -31,12 +37,9 @@ x-common-keys-core: &common-keys-core
     - no-new-privileges:true
   restart: always
 
-x-common-keys-core-no-dns: &common-keys-core-no-dns
-  networks:
-    - proxy
-  security_opt:
-   - no-new-privileges:true
-  restart: always
+x-common-keys-with-dns-core: &common-keys-dns-core
+  <<: *common-keys-core
+  <<: *dns-core
 
 x-common-keys-apps: &common-keys-apps
   networks:
@@ -44,11 +47,7 @@ x-common-keys-apps: &common-keys-apps
   security_opt:
     - no-new-privileges:true
   restart: unless-stopped
-  dns:
-    - 192.168.4.45
-    - 8.8.8.8
-    - 8.8.4.4 
-    - 1.1.1.1 
+  <<: *dns-core
 
 x-common-keys-media: &common-keys-media
   networks:
@@ -59,577 +58,30 @@ x-common-keys-media: &common-keys-media
 
 ############################ SERVICES ###############################
 services:
-  # pihole:
-  #   <<: *common-keys-core
-  #   container_name: pihole
-  #   image: pihole/pihole:latest
-  #   environment:
-  #     <<: *default-tz-puid-pgid
-  #     WEBPASSWORD: $PIHOLE_WEBPASSWORD
-  #   hostname: $DOMAIN
-  #   ports:
-  #     - 53:53/tcp
-  #     - 53:53/udp
-  #   labels:
-  #     - traefik.enable=true
-  #     - traefik.http.routers.pihole.entrypoints=https
-  #     - traefik.http.routers.pihole.rule=Host(`pihole.$DOMAIN`)
-  #     - traefik.http.routers.pihole.tls=true
-  #     - traefik.http.routers.pihole.middlewares=chain-basic-auth@file 
-  #     - traefik.http.routers.p2ihole.service=pihole-svc
-  #     - traefik.http.services.pihole-svc.loadbalancer.server.port=80 
-  #   volumes:
-  #     - $DAPPDATA/pihole:/etc/pihole
-  #     - $DSHARED/dnsmasq.d:/etc/dnsmasq.d
-  #     - $DLOGS/pihole:/var/log
-  #
-  inventoy:
-    <<: *common-keys-core
-    container_name: inventoy
-    image: thedrobe/iventoy-docker:latest
-    ports:
-      - 26000:26000/tcp
-      - 26000:26000/udp
-    environment:
-      <<: *default-tz-puid-pgid
-    volumes:
-      - $DMEDIA/iso:/app/iso:ro 
-      - $DLOGS/inventoy:/app/log:rw
-    privileged: true
-    stop_signal: SIGINT
-
+  ## ---------- DNS Service ---------- ##
   dnsmasq:
-    <<: *common-keys-core-no-dns
-    container_name: dnsmasq
-    image: jpillora/dnsmasq
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - $DSHARED/dnsmasq.conf:/etc/dnsmasq.conf:ro 
-      - $DSHARED/dnsmasq.d:/etc/dnsmasq.d:rw
-    logging:
-      options:
-        max-size: 100m
-    cap_add:
-        - NET_ADMIN
-    ports:
-      - 53:53/udp
-      - 53:53/tcp
-    environment:
-      <<: *default-tz-puid-pgid
-      HTTP_USER: $DNSMASQ_USER
-      HTTP_PASS: $DNSMASQ_PASS
-    labels:
-      traefik.enable: true
-      traefik.http.routers.dnsmasq.entrypoints: https
-      traefik.http.routers.dnsmasq.rule: Host(`dns.$DOMAIN`)
-      traefik.http.routers.dnsmasq.tls: true
-      traefik.http.routers.dnsmasq.middlewares: chain-no-auth@file
-      traefik.http.routers.dnsmasq.service: dnsmasq-svc
-      traefik.http.services.dnsmasq-svc.loadbalancer.server.port: 5380
-
-  wireguard:
     <<: *common-keys-core
-    container_name: wireguard
-    image: lscr.io/linuxserver/wireguard:latest
-    cap_add:
-      - NET_ADMIN
-    environment:
-      <<: *default-tz-puid-pgid
-      PEERS: nicolas,meddy,michael
-    volumes:
-      - $DAPPDATA/wireguard:/config:rw
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1 
-    labels:
-      traefik.enable: true
-      traefik.udp.routers.wireguard.entrypoints: wireguard
-      traefik.udp.routers.wireguard.service: wireguard
-      traefik.udp.services.wireguard.loadbalancer.server.port: 51820
-
-  traefik:
-    <<: *common-keys-core
-    container_name: traefik
-    image: traefik:latest
-    command:
-      - --global.checkNewVersion=true
-      - --global.sendAnonymousUsage=false
-      - --entryPoints.http.address=:80
-      - --entryPoints.https.address=:443
-      - --entryPoints.wireguard.address=:51820/udp
-      # auto force SSL
-      - --entryPoints.http.http.redirections.entrypoint.to=https
-      - --entrypoints.http.http.redirections.entrypoint.scheme=https
-      - --entryPoints.http.http.redirections.entryPoint.permanent=true
-      # Allow these IPs to set the X-Forwarded-* headers 
-      - --entrypoints.https.forwardedHeaders.trustedIPs=$CLOUDFLARE_IPS,$LOCAL_IPS
-      - --entryPoints.traefik.address=:8080
-      - --api=true
-      - --api.insecure=true
-      - --api.dashboard=true
-      # - --serversTransport.insecureSkipVerify=true
-      - --log=true
-      - --log.filePath=/logs/traefik.log
-      - --log.level=$LOG_LEVEL # (Default: error) DEBUG, INFO, WARN, ERROR, FATAL, PANIC
-      - --accessLog=true
-      - --accessLog.filePath=/logs/access.log
-      - --accessLog.bufferingSize=100 # Configuring a buffer of 100 lines
-      - --accessLog.filters.statusCodes=204-299,400-499,500-599
-      - --providers.docker=true
-      - --providers.docker.endpoint=unix:///var/run/docker.sock # Use Docker Socket Proxy instead for improved security
-      # - --providers.docker.endpoint=tcp://socket-proxy:2375 # Use this instead of the previous line if you have socket proxy.
-      - --providers.docker.exposedByDefault=false
-      - --entrypoints.https.http.tls.options=tls-opts@file
-      # Add dns-cloudflare as default certresolver for all services. Also enables TLS and no need to specify on individual services
-      - --entrypoints.https.http.tls.certresolver=dns-cloudflare
-      - --entrypoints.https.http.tls.domains[0].main=$DOMAIN
-      - --entrypoints.https.http.tls.domains[0].sans=*.$DOMAIN
-      # - --entrypoints.https.http.tls.domains[1].main=$DOMAINNAME2 # Pulls main cert for second domain
-      # - --entrypoints.https.http.tls.domains[1].sans=*.$DOMAINNAME2 # Pulls wildcard cert for second domain
-      - --providers.docker.network=proxy
-      - --providers.docker.swarmMode=false
-      - --providers.file.directory=/rules # Load dynamic configuration from one or more .toml or .yml files in a directory
-      # - --providers.file.filename=/path/to/file # Load dynamic configuration from a file  
-      - --providers.file.watch=true # Only works on top level files in the rules folder
-      # - --certificatesResolvers.dns-cloudflare.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory # LetsEncrypt Staging Server - uncomment when testing
-      - --certificatesResolvers.dns-cloudflare.acme.email=$CLOUDFLARE_EMAIL
-      - --certificatesResolvers.dns-cloudflare.acme.storage=/acme.json
-      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.provider=cloudflare
-      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53
-      - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.delayBeforeCheck=90 # To delay DNS check and reduce LE hitrate
-    networks:
-      - proxy
-    ports:
-      - target: 80
-        published: 80 
-        protocol: tcp
-        mode: host
-      - target: 443
-        published: 443
-        protocol: tcp
-        mode: host
-    volumes:
-      - ${DAPPDATA}/traefik/rules/cloudserver:/rules
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${DAPPDATA}/traefik/acme/acme.json:/acme.json
-      - ${DLOGS}/cloudserver/traefik:/logs
-      - ${DSHARED}:/shared
-    environment:
-      - TZ=$TZ 
-      - CF_API_EMAIL=$CLOUDFLARE_EMAIL
-      - CF_API_KEY=$CLOUDFLARE_API_KEY
-      - DOMAIN=$DOMAIN
-    labels:
-      traefik.enable: true
-      traefik.http.routers.http-catch-all.entrypoints: https
-      traefik.http.routers.http-catch-all.rule: HostRegexp(`{host:.+}`)
-      traefik.http.routers.http-catch-all.middlewares: redirect-to-https
-      traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: https
-      # HTTP routers
-      traefik.http.routers.traefik-rtr.entrypoints: https
-      traefik.http.routers.traefik-rtr.rule: Host(`traefik.$DOMAIN`)
-      traefik.http.routers.traefik-rtr.tls: true
-      traefik.http.routers.traefik-rtr.tls.certresolver: dns-cloudflare
-      traefik.http.routers.traefik-rtr.tls.domains[0].main: $DOMAIN
-      traefik.http.routers.traefik-rtr.tls.domains[0].sans: str!! *.$DOMAIN 
-      traefik.http.routers.traefik-rtr.service: api@internal
-      traefik.http.routers.traefik-rtr.middlewares: chain-basic-auth@file 
-  homeassistant:
-    <<: *common-keys-apps
-    image: ghcr.io/home-assistant/home-assistant:stable
-    container_name: homeassistant
-    volumes:
-      - $DAPPDATA/homeassitant:/config:rw
-      - /etc/localtime:/etc/localtime:ro 
-      - /run/dbus:/run/dbus:ro  
-    environment:
-      <<: *umask-tz-puid-pgid
-      HC_IGNORE_SSL: true
-      # DISABLE_JEMALLOC: true
-    privileged: true
-    ports:
-      - 8123:8123
-    labels:
-      traefik.enable: true
-      traefik.http.routers.homeassistant.entrypoints: https
-      traefik.http.routers.homeassistant.rule: Host(`home.$DOMAIN`)
-      traefik.http.routers.homeassistant.tls: true
-      traefik.http.routers.homeassistant.middlewares: chain-no-auth@file
-      traefik.http.routers.homeassistant.service: homeassistant-svc
-      traefik.http.services.homeassistant-svc.loadbalancer.server.port: 8123
-      traefik.http.services.homeassistant-svc.loadbalancer.sticky.cookie: true
-      traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto: https
-
-  mosquitto:
-    <<: *common-keys-apps
-    image: eclipse-mosquitto
-    container_name: mosquitto
-    environment:
-      <<: *default-tz-puid-pgid
-    volumes:
-      - $DSHARED/mosquitto/config:/mosquitto/config:rw
-      - $DAPPDATA/mosquitto:/mosquitto/data:rw
-      - $DLOGS/mosquitto:/mosquitto/log:rw
-    ports:
-      - 1883:1883
-      - 9001:9001
-
-  mosquitto-client:
-    <<: *common-keys-apps
-    image: emqx/mqttx-web
-    container_name: mosquitto-client
-    environment:
-      <<: *default-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.mosquitto-client.entrypoints: https
-      traefik.http.routers.mosquitto-client.rule: Host(`mqtt.$DOMAIN`)
-      traefik.http.routers.mosquitto-client.tls: true
-      traefik.http.routers.mosquitto-client.middlewares: chain-basic-auth@file
-      traefik.http.routers.mosquitto-client.service: mosquitto-client-svc
-      traefik.http.services.mosquitto-client-svc.loadbalancer.server.port: 80 
-
-  zigbee2mqtt:
-    <<: *common-keys-core
-    image: koenkk/zigbee2mqtt
-    container_name: zigbee2mqtt
-    volumes:
-      - $DAPPDATA/zigbee2mqtt:/app/data:rw
-      - /run/udev:/run/udev:ro 
-      - $DSCRIPTS/searchtty.sh:/app/searchtty.sh:ro
-    environment:
-      <<: *default-tz-puid-pgid
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
-    labels:
-      traefik.enable: true
-      traefik.http.routers.zigbee2mqtt.entrypoints: https
-      traefik.http.routers.zigbee2mqtt.rule: Host(`zigbee.$DOMAIN`)
-      traefik.http.routers.zigbee2mqtt.tls: true 
-      traefik.http.routers.zigbee2mqtt.middlewares: chain-no-auth@file
-      traefik.http.routers.zigbee2mqtt.service: zigbee2mqtt-svc
-      traefik.http.services.zigbee2mqtt-svc.loadbalancer.server.port: 8080
-       
-  watchtower:
-    <<: *common-keys-apps
-    image: containrrr/watchtower
-    container_name: watchtower
-    environment:
-      <<: *default-tz-puid-pgid
-      WATCHTOWER_CLEANUP: $WATCHTOWER_CLEANUP
-      WATCHTOWER_INCLUDE_RESTARTING: $WATCHTOWER_INCLUDE_RESTARTING
-      WATCHTOWER_SCHEDULE: $WATCHTOWER_SCHEDULE
-      WATCHTOWER_ROLLING_RESTART: $WATCHTOWER_ROLLING_RESTART
-      WATCHTOWER_LOG_LEVEL: $LOG_LEVEL
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-  portainer:
-    <<: *common-keys-apps
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    command: -H unix:///var/run/docker.sock
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${DAPPDATA}/portainer/data:/data
-    environment:
-      <<: *default-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.portainer.entrypoints: https
-      traefik.http.routers.portainer.rule: Host(`portainer.$DOMAIN`)
-      traefik.http.routers.portainer.tls: true
-      traefik.http.routers.portainer.middlewares: chain-no-auth@file
-      traefik.http.routers.portainer.service: portainer-svc
-      traefik.http.services.portainer-svc.loadbalancer.server.port: 9000
-  # heimdall:
-  #   <<: *common-keys-apps
-  #   image: lscr.io/linuxserver/heimdall:latest
-  #   container_name: heimdall
-  #   environment:
-  #     <<: *default-tz-puid-pgid
-  #   volumes:
-  #     - $DAPPDATA/heimdall:/config
-  #   labels:
-  #     traefik.enable: true
-  #     traefik.http.routers.heimdall.entrypoints: https
-  #     traefik.http.routers.heimdall.rule: Host(`$DOMAIN`, `www.$DOMAIN`)
-  #     traefik.http.routers.heimdall.tls: true
-  #     traefik.http.routers.heimdall.middlewares: chain-basic-auth@file 
-  #     traefik.http.routers.heimdall.service: heimdall-svc
-  #     traefik.http.services.heimdall-svc.loadbalancer.server.port: 80
-  homarr:
-    <<: *common-keys-apps
-    image: ghcr.io/ajnart/homarr:latest
-    container_name: homarr
-    volumes:
-      - $DAPPDATA/homarr/config:/app/data/configs
-      - $DAPPDATA/homarr/icons:/app/public/icons
-    labels:
-      traefik.enable: true
-      traefik.http.routers.homarr.entrypoints: https
-      traefik.http.routers.homarr.rule: Host(`$DOMAIN`, `www.$DOMAIN`)
-      traefik.http.routers.homarr.tls: true
-      traefik.http.routers.homarr.middlewares: chain-no-auth@file
-      traefik.http.routers.homarr.service: homarr-svc
-      traefik.http.services.homarr-svc.loadbalancer.server.port: 7575
-  librespeed:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/librespeed:latest
-    container_name: librespeed
-    environment:
-      <<: *default-tz-puid-pgid
-    volumes:
-      - $DAPPDATA/librespeed:/config
-    labels:
-      traefik.enable: true
-      traefik.http.routers.librespeed.entrypoints: https
-      traefik.http.routers.librespeed.rule: Host(`speed.$DOMAIN`)
-      traefik.http.routers.librespeed.tls: true
-      traefik.http.routers.librespeed.middlewares: chain-basic-auth@file
-      traefik.http.routers.librespeed.service: librespeed-svc
-      traefik.http.services.librespeed-svc.loadbalancer.server.port: 80
-
-  nodered:
-    <<: *common-keys-apps
-    image: nodered/node-red:latest
-    container_name: node-red
-    environment:
-      <<: *default-tz-puid-pgid
-    ports:
-      - 1880:1880
-    volumes:
-      - $DAPPDATA/nodered:/data
-    labels:
-      traefik.enable: true
-      traefik.http.routers.nodered.entrypoints: https
-      traefik.http.routers.nodered.rule: Host(`red.$DOMAIN`)
-      traefik.http.routers.nodered.tls: true
-      traefik.http.routers.nodered.middlewares: chain-basic-auth@file
-      traefik.http.routers.nodered.service: nodered-svc
-      traefik.http.services.nodered-svc.loadbalancer.server.port: 1880
-  znc:
-    <<: *common-keys-apps
-    image: znc
-    container_name: znc
-    environment:
-      <<: *default-tz-puid-pgid
-    volumes:
-      - $DAPPDATA/znc:/znc-data:rw
-    ports:
-      - 6501:6501
-    labels:
-      traefik.enable: true
-      traefik.http.routers.znc.entrypoints: https
-      traefik.http.routers.znc.rule: Host(`znc.$DOMAIN`)
-      traefik.http.routers.znc.tls: true
-      traefik.http.routers.znc.middlewares: chain-no-auth@file
-      traefik.http.routers.znc.service: znc-svc
-      traefik.http.services.znc-svc.loadbalancer.server.port: 6501
-
-  thelounge:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/thelounge:latest
-    container_name: thelounge
-    environment:
-       <<: *default-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.thelounge.entrypoints: https
-      traefik.http.routers.thelounge.rule: Host(`irc.$DOMAIN`)
-      traefik.http.routers.thelounge.tls: true
-      traefik.http.routers.thelounge.middlewares: chain-basic-auth@file
-      traefik.http.routers.thelounge.service: thelounge-svc
-      traefik.http.services.thelounge-svc.loadbalancer.server.port: 9000
-    volumes:
-      - $DAPPDATA/thelounge:/config
-  sonarr:  
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/sonarr:latest
-    container_name: sonarr
-    environment:
-      <<: *umask-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.sonarr.entrypoints: https
-      traefik.http.routers.sonarr.rule: Host(`sonarr.$DOMAIN`, `series.$DOMAIN`)
-      traefik.http.routers.sonarr.tls: true
-      traefik.http.routers.sonarr.middlewares: chain-basic-auth@file
-      traefik.http.routers.sonarr.service: sonarr-svc
-      traefik.http.services.sonarr-svc.loadbalancer.server.port: 8989
-    volumes:
-      - $DAPPDATA/sonarr:/config
-      - $DMEDIA/tv:/tv
-      - $DMEDIA/downloads:/downloads
-  radarr:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/radarr:latest
-    container_name: radarr
-    environment:
-      <<: *umask-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.radarr.entrypoints: https
-      traefik.http.routers.radarr.rule: Host(`radarr.$DOMAIN`, `movies.$DOMAIN`)
-      traefik.http.routers.radarr.tls: true
-      traefik.http.routers.radarr.middlewares: chain-basic-auth@file
-      traefik.http.routers.radarr.service: radarr-svc
-      traefik.http.services.radarr-svc.loadbalancer.server.port: 7878
-    volumes:
-      - $DAPPDATA/radarr:/config
-      - $DMEDIA/movies:/movies
-      - $DMEDIA/downloads:/downloads
-  bazarr:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/bazarr:latest
-    container_name: bazarr
-    environment:
-      <<: *umask-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.bazarr.entrypoints: https
-      traefik.http.routers.bazarr.rule: Host(`subs.$DOMAIN`)
-      traefik.http.routers.bazarr.tls: true
-      traefik.http.routers.bazarr.middlewares: chain-basic-auth@file
-      traefik.http.routers.bazarr.service: bazarr-svc
-      traefik.http.services.bazarr-svc.loadbalancer.server.port: 6767
-    volumes:
-      - $DAPPDATA/bazarr:/config
-      - $DMEDIA/tv:/tv 
-      - $DMEDIA/movies:/movies
-  jellyfin:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    environment:
-      <<: *default-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.jellyfin.entrypoints: https
-      traefik.http.routers.jellyfin.rule: Host(`jellyfin.$DOMAIN`)
-      traefik.http.routers.jellyfin.tls: true
-      traefik.http.routers.jellyfin.middlewares: chain-no-auth@file
-      traefik.http.routers.jellyfin.service: jellyfin-svc
-      traefik.http.services.jellyfin-svc.loadbalancer.server.port: 8096
-    ports:
-      - 1900:1900/udp
-      - 7359:7359/udp
-    volumes:
-      - $DAPPDATA/jellyfin:/config
-      - $DMEDIA/movies:/movies
-      - $DMEDIA/tv:/tv
-    devices:
-      # INTEL ACCELERARION HARDWARE
-      - /dev/dri:/dev/dri
-  transmission:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/transmission:latest
-    container_name: transmission
-    environment:
-      <<: *umask-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.transmission.entrypoints: https
-      traefik.http.routers.transmission.rule: Host(`torrent.$DOMAIN`)
-      traefik.http.routers.transmission.tls: true
-      traefik.http.routers.transmission.middlewares: chain-basic-auth@file
-      traefik.http.routers.transmission.service: transmission-svc
-      traefik.http.services.transmission-svc.loadbalancer.server.port: 9091
-    volumes:
-      - $DAPPDATA/transmission:/config
-      - $DMEDIA/downloads:/downloads
-      - $DSHARED/watch:/watch 
-    ports:
-      - 51413:51413
-      - 51413:51413/udp
-  plex: 
-    <<: *common-keys-apps
-    # Comment for amd apu/gpu acceleration
-    image: lscr.io/linuxserver/plex:latest
-    # uncomment if you use amd acceleration
-    # build:
-    #   context: $DSCRIPT/plex
-    #  dockerfile: ./amd.Dockerfile
-    container_name: plex
-    environment:
-      <<: *umask-tz-puid-pgid
-      VERSION: docker
-      PLEX_CLAIM: $PLEX_CLAIM
-      PLEX_UID: $PUID
-      PLEX_GID: $PGID
-    labels:
-      traefik.enable: true
-      traefik.http.routers.plex.entrypoints: https
-      traefik.http.routers.plex.rule: Host(`plex.$DOMAIN`)
-      traefik.http.routers.plex.tls: true
-      traefik.http.routers.plex.middlewares: chain-no-auth@file
-      traefik.http.routers.plex.service: plex-svc
-      traefik.http.services.plex-svc.loadbalancer.server.port: 32400
-    ports:
-      - 32400:32400/tcp
-      - 32400:32400/udp
-      - 3500:3500/tcp
-      - 3500:3500/udp
-      - 8324:8324/tcp
-      - 32469:32469/tcp
-      - 32410:32410/udp
-      - 32411:32411/udp
-      - 32412:32412/udp
-      - 32413:32413/udp
-      - 32414:32414/udp
-      # before uncomment disable jellyfin  
-      # - 1900:1900/udp
-    devices:
-      # Intel acceleration hardware enable
-      - /dev/dri:/dev/dri
-      # for nvidia acceleration look in https://docs.linuxserver.io/images/docker-plex#nvidia
-    volumes:
-      - $DAPPDATA/plex/config:/config
-      - $DMEDIA/tv:/tv 
-      - $DMEDIA/movies:/movies
-  prowlarr:
-    <<: *common-keys-apps
-    image: lscr.io/linuxserver/prowlarr:latest
-    container_name: prowlarr
-    environment:
-      <<: *umask-tz-puid-pgid
-    labels:
-      traefik.enable: true
-      traefik.http.routers.prowlarr.entrypoints: https
-      traefik.http.routers.prowlarr.rule: Host(`prowlarr.$DOMAIN`, `indexers.$DOMAIN`)
-      traefik.http.routers.prowlarr.tls: true
-      traefik.http.routers.prowlarr.middlewares: chain-no-auth@file
-      traefik.http.routers.prowlarr.service: prowlarr-svc
-      traefik.http.services.prowlarr-svc.loadbalancer.server.port: 9696
-    volumes:
-      - $DAPPDATA/prowlarr:/config
-  filebrowser:
-    <<: *common-keys-apps
-    image: hurlenko/filebrowser:latest
-    container_name: filebrowser
-    environment:
-      <<: *default-tz-puid-pgid
-    user: $PUID:$PGID
-    volumes:
-      - $DMEDIA:/data
-      - $DAPPDATA/filebrowser:/config
-    labels:
-      traefik.enable: true
-      traefik.http.routers.filebrowser.entryPoints: https
-      traefik.http.routers.filebrowser.rule: Host(`files.$DOMAIN`)
-      traefik.http.routers.filebrowser.tls: true
-      traefik.http.routers.filebrowser.middlewares: chain-no-auth@file
-      traefik.http.routers.filebrowser.service: filebrowser-svc
-      traefik.http.services.filebrowser-svc.loadbalancer.server.port: 8080
   
-  mariadb:
-    <<: *common-keys-apps
-    image: mariadb:latest
-    container_name: mariadb
-    environment:
-      <<: *default-tz-puid-pgid
-      MYSQL_ROOT_PASSWORD: $MARIADB_PASSWORD
-    volumes:
-      - $DAPPDATA/mariadb:/var/lib/mysql 
-    ports:
-      - 3306:3306
+  ## ---------- TCP/UDP Services ---------- ##
+  ventoy:
+  mosquitto:
+  modered:
 
-    
+  ## ---------- Media Center ---------- ##
+  sonarr:
+  radarr:
+  bazarr:
+  prowlarr:
+  jellyfin:
+  plex:
+  transmission:
+
+  ## ---------- Management ---------- ##
+  homarr:
+  portainer:
+  traefik:
+  filebrowser:
+
+  ## ---------- Home Automatization ---------- ##
+  
+  

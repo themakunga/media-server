@@ -1,0 +1,95 @@
+x-chain-auth-defaults: &chain-auth-defaults
+  entrypoints: https
+  tls: true
+  middlewares: chain-basic-auth@file
+
+x-chain-no-defaults: &chain-no-defaults
+  entrypoints: https
+  tls: true
+  middlewares: chain-no-auth@file
+
+http:
+  routers:
+    http-catch-all:
+      entrypoints: https
+      rule: HostRegexp(`{host:.+}`)
+      middlewares: redirect-to-https@file
+    traefik:
+      entrypoints: https
+      rule: 'Host(`traefik.{env.DOMAIN}`)'
+      tls:
+        certresolver: dns-cloudflare
+        domains:
+          - main: '{env.DOMAIN}'
+            sans: '*.{env.DOMAIN}'
+      service: api@internal
+      middlewares: chain-basic-auth@file
+    dnsmasq:
+      <<: *chain-auth-defaults
+      rule: 'Host(`dns.{env.DOMAIN}`)'
+      service: dnsmasq
+    homeassistant:
+      <<: *chain-no-defaults 
+      rule: 'Host(`hass.{env.DOMAIN}`)'
+      service: homeassistant
+    mosquitto-client:
+      <<: *chain-auth-defaults
+      rule: 'Host(`mosquitto.{env.DOMAIN}`)'
+      service: mosquitto-client
+    zigbee2mqtt:
+      <<: *chain-auth-defaults
+      rule: 'Host(`zigbee.{env.DOMAIN}`)'
+      service: zigbee2mqtt
+    portainer:
+      <<: *chain-no-defaults
+      rule: 'Host(`portainer.{env.DOMAIN}`)'
+      service: portainer
+    homarr:
+      <<: *chain-no-defaults
+      rule: 'Host(`{env.DOMAIN}`, `www.{env.DOMAIN}`)'
+      service: homarr
+    sonarr:
+      <<: *chain-no-defaults
+      rule: 'Host(`sonarr.{env.DOMAIN}`)'
+      service: sonarr
+    radarr:
+      <<: *chain-no-defaults
+      rule: 'Host(`radarr.{env.DOMAIN}`)'
+      service: radarr
+    bazarr:
+      <<: *chain-no-defaults
+      rule: 'Host(`bazarr.{env.DOMAIN}`)'
+      service: bazarr
+    prowlarr:
+      <<: *chain-no-defaults
+      rule: 'Host(`prowlarr.{env.DOMAIN}`, `indexers.{env.DOMAIN}`)'
+      service: prowlarr
+    librespeed:
+      <<: *chain-auth-defaults
+      rule: 'Host(`speed.{env.DOMAIN}`)'
+      service: librespeed
+    nodered:
+      <<: *chain-auth-defaults 
+      rule: 'Host(`nodered.{env.DOMAIN}`)'
+      service: nodered
+    znc:
+      <<: *chain-no-defaults
+      rule: 'Host(`znc.{env.DOMAIN}`)'
+      service: znc
+    jellyfin:
+      <<: *chain-no-defaults
+      rule: 'Host(`jellyfin.{env.DOMAIN}`)'
+      service: jellyfin
+    plex:
+      <<: *chain-no-defaults
+      rule: 'Host(`plex.{env.DOMAIN}`)'
+      service: plex
+    transmission:
+      <<: *chain-auth-defaults
+      rule: 'Host(`torrent.{env.DOMAIN}`)'
+      service: transmission
+    filebrowser:
+      <<: *chain-no-defaults
+      rule: 'Host(`files.{env.DOMAIN}`)'
+      service: filebrowser
+    
