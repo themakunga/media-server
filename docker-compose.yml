@@ -61,7 +61,21 @@ services:
   ## ---------- DNS Service ---------- ##
   dnsmasq:
     <<: *common-keys-core
-  
+    container_name: dnsmasq
+    image: jpillora/dnsmasq:latest
+    environment:
+      <<: *default-tz-puid-pgid
+      HTTP_USER: $DNSMASQ_USER
+      HTTP_PASS: $DNSMASQ_PASS
+    cap_add:
+      - NET_ADMIN
+    logging:
+      options:
+        max-size: 100m 
+    volumes:
+      - $DOPT/dnsmasq/dnsmasq.d/:/etc/dnsmasq.d/:rw
+      - $DOPT/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro 
+
   ## ---------- TCP/UDP Services ---------- ##
   ventoy:
   mosquitto:
@@ -81,7 +95,15 @@ services:
   portainer:
   traefik:
   filebrowser:
+  watchtower:
 
   ## ---------- Home Automatization ---------- ##
+  mosquitto-client:
+  homeassitant:
   
-  
+  ## ---------- Tools ---------- ##
+  librespeed:
+  znc:
+  thelounge:
+  mariadb:
+  mongodb: 
