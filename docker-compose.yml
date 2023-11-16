@@ -191,9 +191,55 @@ services:
 
   ## ---------- Management ---------- ##
   homarr:
+    <<: *common-keys-apps
+    container_name: homarr
+    image: ghcr.io/ajnart/homarr:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/homarr/config/:/app/data/config/:rw
+      - $DAPPDATA/homarr/icons/:/app/public/icons/:rw
   portainer:
+    <<: *common-keys-dns-core
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $DAPPDATA/portainer/:/data/:rw
   traefik:
+    <<: *common-keys-core
+    container_name: traefik
+    image: traefik:latest
+    environment:
+      <<: default-tz-puid-pgid
+      CF_API_EMAIL: $CLOUDFLARE_EMAIL
+      CF_API_KEY: $CLOUDFLARE_API_KEY
+      DOMAIN: $DOMAIN
+      TRUSTED_IPS: $CLOUDFLARE_IPS,$LOCAL_IPS
+      LOG_LEVEL: $LOG_LEVEL 
+    ports:
+      - 80:80/tcp 
+      - 443:443/tcp 
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $DAPPDATA/traefik/acme.json:/acme.json:rw
+      - $DOPT/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - $DOPT/traefik/rules/:/rules/:ro
+      - $DLOGS/traefik/:/logs/:rw
+      - $DSHARED/:/shared/:rw
   filebrowser:
+    <<: *common-keys-core 
+    container_name: filebrowser
+    image: hurlenko/filebrowser:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    user: $PUID:$PGID
+    volumes:
+      - $DMEDIA/:/data/:rw
+      - $DAPPDATA/filebrowser/:/config/:rw
   watchtower:
 
   ## ---------- Home Automatization ---------- ##
