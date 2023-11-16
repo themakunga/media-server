@@ -78,17 +78,116 @@ services:
 
   ## ---------- TCP/UDP Services ---------- ##
   ventoy:
+    <<: *common-keys-core
+    container_name: ventoy
+    image: thedrobe/inventoy-docker:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    privileged: true
+    stop_signal: SIGINT
+    volumes:
+      - $DMEDIA/iso/:/app/iso/:ro
+      - $DLOGS/ventoy/:/app/log/:rw
   mosquitto:
-  modered:
-
+    <<: *common-keys-core
+    container_name: mosquitto 
+    image: eclipse-mosquitto:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    volumes:
+      - $DOPT/mosquitto/:/mosquitto/config/:rw
+      - $DAPPDATA/mosquitto/:/mosquitto/data/:rw
+      - $DLOGS/mosquitto/:/mosquitto/log/:rw
+  nodered:
+    <<: *common-keys-dns-core
+    container_name: nodered
+    image: nodered/node-red:latest
+    environment:
+      <<: *default-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/nodered/:/data/:rw
   ## ---------- Media Center ---------- ##
   sonarr:
+    <<: *common-keys-apps
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    environment:
+      <<: *umask-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/sonarr/:/config/:rw
+      - $DMEDIA/tv/:/tv/:rw
+      - $DMEDIA/downloads/:/downloads/:rw
   radarr:
+    <<: *common-keys-apps
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:latest
+    environment:
+      <<: *umask-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/radarr/:/config/:rw
+      - $DMEDIA/movies/:/movies/:rw
+      - $DMEDIA/downloads/:/downloads/:rw
   bazarr:
+    <<: *common-keys-apps
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    environment:
+      <<: *umask-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/bazarr/:/config/:rw
+      - $DMEDIA/tv/:/tv/:rw
+      - $DMEDIA/movies/:/movies/:rw
   prowlarr:
+    <<: *common-keys-apps
+    container_name: prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    environment:
+      <<: *umask-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/prowlarr/:/config/:rw
   jellyfin:
+    <<: *common-keys-apps
+    container_name: jellyfin
+    image: lscr.io/linuxserver/jellyfin:latest
+    environment:
+      <<: *umask-tz-puid-pgid
+      JELLYFIN_PublishedServerUrl: $JELLYFIN_SERVERURL 
+    volumes:
+      - $DAPPDATA/jellyfin/:/config/:rw
+      - $DMEDIA/tv/:/data/tvshows/:rw
+      - $DMEDIA/movies/:/data/movies/:rw
   plex:
+    <<: *common-keys-apps
+    container_name: plex
+    # comment next line if you are using AMD acceleration 
+    image: lscr.io/linuxserver/plex:latest
+    # uncomment next to build and use AMD acceleration
+    # build:
+    #   context: $DSCRIPT/plex
+    #   dockerfile: ./amd.Dockerfile 
+    environment:
+      <<: *umask-tz-puid-pgid
+      VERSION: docker 
+      PLEX_CLAIM: $PLEX_CLAIM
+      PLEX_PGID: $PGID
+      PLEX_PUID: $PUID
+    devices:
+      # Intel acceleration hardware enable
+      - /dev/dri:/dev/dri 
+    volumes:
+      - $DAPPDATA/plex/:/config/:rw
+      - $DMEDIA/tv/:/tv/:rw
+      - $DMEDIA/movies/:/movies/rw
   transmission:
+    <<: *common-keys-apps
+    container_name: transmission
+    image: lscr.io/linuxserver/transmission:latest
+    environment:
+      <<: *umask-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/transmission/:/config/:rw
+      - $DMEDIA/downloads/:/downloads/:rw
+      - $DSHARED/watch/:/watch/:rw
 
   ## ---------- Management ---------- ##
   homarr:
@@ -99,6 +198,7 @@ services:
 
   ## ---------- Home Automatization ---------- ##
   mosquitto-client:
+  zigbee2mqtt:
   homeassitant:
   
   ## ---------- Tools ---------- ##
@@ -106,4 +206,5 @@ services:
   znc:
   thelounge:
   mariadb:
-  mongodb: 
+  mongodb:
+  cloudflared:
