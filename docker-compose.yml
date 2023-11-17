@@ -163,7 +163,7 @@ services:
     image: lscr.io/linuxserver/plex:latest
     # uncomment next to build and use AMD acceleration
     # build:
-    #   context: $DSCRIPT/plex
+    #   context: $DCUSTOM/plex
     #   dockerfile: ./amd.Dockerfile 
     environment:
       <<: *umask-tz-puid-pgid
@@ -256,8 +256,35 @@ services:
 
   ## ---------- Home Automatization ---------- ##
   mosquitto-client:
+    <<: *common-keys-core
+    container_name: mosquitto-client
+    image: emqx/mqttx-web:latest
+    environment:
+      <<: *default-tz-puid-pgid
   zigbee2mqtt:
+    <<: *common-keys-core
+    container_name: zigbee2mqtt
+    image: koenkk/zigbee2mqtt
+    environment:
+      <<: *default-tz-puid-pgid
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    volumes:
+      - /run/udev:/run/udev:ro
+      - $DAPPDATA/zigbee2mqtt/:/app/data/:rw
+      - $DSCRIPT/searchtty.sh:/app/searchtty.sh:ro 
   homeassitant:
+    <<: *common-keys-core
+    container_name: homeassitant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    environment:
+      <<: *default-tz-puid-pgid
+      HC_IGNORE_SSL: true
+    privileged: true
+    container_name:
+      - /etc/localtime:/etc/localtime:ro 
+      - /run/dbus:/run/dbus:ro 
+      - $DAPPDATA/homeassitant/:/config/:rw
   
   ## ---------- Tools ---------- ##
   librespeed:
