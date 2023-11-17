@@ -241,6 +241,18 @@ services:
       - $DMEDIA/:/data/:rw
       - $DAPPDATA/filebrowser/:/config/:rw
   watchtower:
+    <<: *common-keys-core
+    container_name: watchtower
+    image: containrrr/watchtower:latest
+    environment:
+      <<: *default-tz-puid-pgid
+      WATCHTOWER_CLEANUP: $WATCHTOWER_CLEANUP
+      WATCHTOWER_INCLUDE_RESTARTING: $WATCHTOWER_INCLUDE_RESTARTING
+      WATCHTOWER_SCHEDULE: $WATCHTOWER_SCHEDULE
+      WATCHTOWER_LOG_LEVEL: $LOG_LEVEL
+      WATCHTOWER_ROLLING_RESTART: $WATCHTOWER_ROLLING_RESTART
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
 
   ## ---------- Home Automatization ---------- ##
   mosquitto-client:
