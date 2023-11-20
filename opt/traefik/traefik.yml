@@ -23,7 +23,7 @@ providers:
     directory: /rules
     watch: true 
 
-certificateResolvers:
+certificatesResolvers:
   dns-cloudflare:
     acme:
       email: {env.CLOUDFLARE_EMAIL}
@@ -57,7 +57,8 @@ entryPoints:
         options: tls-ops@file 
         certresolver: dns-cloudflare
         domains:
-          - main: '{env.DOMAIN}'
-            sans: '*.{env.DOMAIN}'
+          - main: {env.DOMAIN}
+            sans: "*.{{env 'DOMAIN'}}"
   traefik:
     address: !!str ':8080'
+  

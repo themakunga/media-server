@@ -38,8 +38,7 @@ x-common-keys-core: &common-keys-core
   restart: always
 
 x-common-keys-with-dns-core: &common-keys-dns-core
-  <<: *common-keys-core
-  <<: *dns-core
+  <<: [*common-keys-core, *dns-core]
 
 x-common-keys-apps: &common-keys-apps
   networks:
@@ -56,6 +55,12 @@ x-common-keys-media: &common-keys-media
     - no-new-privileges:true
   restart: no 
 
+x-port-list: &port-list
+  ports:
+    - 80:80
+    - 443:443
+    - 8080:8080 # traefik api 
+
 ############################ SERVICES ###############################
 services:
   ## ---------- DNS Service ---------- ##
@@ -71,20 +76,26 @@ services:
       - NET_ADMIN
     logging:
       options:
-        max-size: 100m 
+        max-size: 100m
+    ports:
+      - 53:53/tcp
+      - 53:53/udp
     volumes:
       - $DOPT/dnsmasq/dnsmasq.d/:/etc/dnsmasq.d/:rw
       - $DOPT/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro 
 
   ## ---------- TCP/UDP Services ---------- ##
-  ventoy:
+  iventoy:
     <<: *common-keys-core
-    container_name: ventoy
-    image: thedrobe/inventoy-docker:latest
+    container_name: iventoy
+    image: thedrobe/iventoy-docker:latest
     environment:
       <<: *default-tz-puid-pgid
     privileged: true
     stop_signal: SIGINT
+    ports:
+      - 2600:2600/tcp
+      - 2600:2500/udp
     volumes:
       - $DMEDIA/iso/:/app/iso/:ro
       - $DLOGS/ventoy/:/app/log/:rw
@@ -94,6 +105,11 @@ services:
     image: eclipse-mosquitto:latest
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 1883:1883/tcp
+      - 1883:1883/udp
+      - 9001:9001/tcp
+      - 9001:9001/udp 
     volumes:
       - $DOPT/mosquitto/:/mosquitto/config/:rw
       - $DAPPDATA/mosquitto/:/mosquitto/data/:rw
@@ -104,6 +120,9 @@ services:
     image: nodered/node-red:latest
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 1880:1880/tcp
+      - 1880:1880/udp
     volumes:
       - $DAPPDATA/nodered/:/data/:rw
   ## ---------- Media Center ---------- ##
@@ -152,6 +171,9 @@ services:
     environment:
       <<: *umask-tz-puid-pgid
       JELLYFIN_PublishedServerUrl: $JELLYFIN_SERVERURL 
+    ports:
+      - 1900:1900/tcp
+      - 1900:1900/udp
     volumes:
       - $DAPPDATA/jellyfin/:/config/:rw
       - $DMEDIA/tv/:/data/tvshows/:rw
@@ -174,6 +196,15 @@ services:
     devices:
       # Intel acceleration hardware enable
       - /dev/dri:/dev/dri 
+    ports:
+      - 32400:32400/tcp
+      - 8324:8324/tcp
+      - 32469:32469/tcp
+      - 32410:3210/udp
+      - 32411:32411/udp
+      - 32412:32212/udp
+      - 32413:32413/udp
+      - 32414:32414/udp
     volumes:
       - $DAPPDATA/plex/:/config/:rw
       - $DMEDIA/tv/:/tv/:rw
@@ -184,6 +215,10 @@ services:
     image: lscr.io/linuxserver/transmission:latest
     environment:
       <<: *umask-tz-puid-pgid
+    ports:
+      - 9091:9091/tcp
+      - 51413:51413/tcp
+      - 51413:51413/udp
     volumes:
       - $DAPPDATA/transmission/:/config/:rw
       - $DMEDIA/downloads/:/downloads/:rw
@@ -198,6 +233,7 @@ services:
       <<: *default-tz-puid-pgid
     volumes:
       - $DAPPDATA/homarr/config/:/app/data/config/:rw
+      - $DAPPDATA/homarr/data/:/data:rw
       - $DAPPDATA/homarr/icons/:/app/public/icons/:rw
   portainer:
     <<: *common-keys-dns-core
@@ -210,19 +246,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - $DAPPDATA/portainer/:/data/:rw
   traefik:
-    <<: *common-keys-core
+    <<: [*common-keys-dns-core, *port-list]
     container_name: traefik
     image: traefik:latest
     environment:
-      <<: default-tz-puid-pgid
+      <<: *default-tz-puid-pgid
       CF_API_EMAIL: $CLOUDFLARE_EMAIL
       CF_API_KEY: $CLOUDFLARE_API_KEY
       DOMAIN: $DOMAIN
       TRUSTED_IPS: $CLOUDFLARE_IPS,$LOCAL_IPS
       LOG_LEVEL: $LOG_LEVEL 
-    ports:
-      - 80:80/tcp 
-      - 443:443/tcp 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - $DAPPDATA/traefik/acme.json:/acme.json:rw
@@ -272,19 +305,33 @@ services:
     volumes:
       - /run/udev:/run/udev:ro
       - $DAPPDATA/zigbee2mqtt/:/app/data/:rw
-      - $DSCRIPT/searchtty.sh:/app/searchtty.sh:ro 
-  homeassitant:
-    <<: *common-keys-core
-    container_name: homeassitant
+      - $DSCRIPTS/searchtty.sh:/app/searchtty.sh:ro 
+  homeassistant:
+    <<: *common-keys-dns-core
+    container_name: homeassistant
     image: ghcr.io/home-assistant/home-assistant:stable
     environment:
       <<: *default-tz-puid-pgid
       HC_IGNORE_SSL: true
     privileged: true
+    ports: 
+      - 8123:8123/tcp
+      - 8124:8124/tcp
     volumes:
       - /etc/localtime:/etc/localtime:ro 
       - /run/dbus:/run/dbus:ro 
-      - $DAPPDATA/homeassitant/:/config/:rw
+      - $DOPT/homeassistant/themes/:/config/themes/:ro 
+      - $DOPT/homeassistant/www/:/config/www/:ro 
+      - $DOPT/homeassistant/configuration.yaml:/config/configuration.yaml:ro 
+      - $DOPT/homeassistant/automations.yaml:/config/automations.yaml:ro 
+      - $DOPT/homeassistant/http.yaml:/config/http.yaml:ro 
+      - $DOPT/homeassistant/mqtt.yaml:/config/mqtt.yaml:ro 
+      - $DOPT/homeassistant/recorder.yaml:/config/recorder.yaml:ro 
+      - $DOPT/homeassistant/scenes.yaml:/config/scenes.yaml:rw 
+      - $DOPT/homeassistant/scripts.yaml:/config/scripts.yaml:ro 
+      - $DOPT/homeassistant/secrets.yaml:/config/secrets.yaml:ro
+      - $DAPPDATA/homeassistant/:/config/:rw
+
   
   ## ---------- Tools ---------- ##
   librespeed:
@@ -295,9 +342,13 @@ services:
       <<: *default-tz-puid-pgid
   znc:
     <<: *common-keys-dns-core
+    container_name: znc 
     image: znc
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 6501:6501/tcp
+      - 6502:6502/tcp
     volumes:
       - $DAPPDATA/znc:/znc-data:rw
   thelounge:
@@ -315,15 +366,19 @@ services:
     environment:
       <<: *default-tz-puid-pgid
       MYSQL_ROOT_PASSWORD: $MARIADB_PASSWORD
+    ports:
+      - 3306:3306/tcp 
     volumes:
       - $DAPPDATA/mariadb/:/var/lib/mysql 
   mongodb:
     <<: *common-keys-core
     container_name: mongodb
-    image: mongo:latest
+    image: mongo
     environment:
       <<: *default-tz-puid-pgid
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USERNAME 
       MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD 
+    ports: 
+      - 27017:27017/tcp 
     volumes:
       - $DAPPDATA/mongodb/:/data/db 

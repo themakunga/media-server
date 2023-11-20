@@ -8,6 +8,12 @@ x-chain-no-defaults: &chain-no-defaults
   tls: true
   middlewares: chain-no-auth@file
 
+x-healthcheck: &x-healthcheck
+  healthCheck:
+    path: / 
+    interval: 30s 
+    timeout: 5s 
+
 http:
   routers:
     http-catch-all:
@@ -16,80 +22,173 @@ http:
       middlewares: redirect-to-https@file
     traefik:
       entrypoints: https
-      rule: 'Host(`traefik.{env.DOMAIN}`)'
+      rule: 'Host(`traefik.{{env "DOMAIN"}}`)'
       tls:
         certresolver: dns-cloudflare
         domains:
-          - main: '{env.DOMAIN}'
-            sans: '*.{env.DOMAIN}'
+          - main: '{{env "DOMAIN"}}'
+            sans: '*.{{env "DOMAIN"}}'
       service: api@internal
       middlewares: chain-basic-auth@file
     dnsmasq:
       <<: *chain-auth-defaults
-      rule: 'Host(`dns.{env.DOMAIN}`)'
+      rule: Host(`dns.{{env "DOMAIN"}}`)
       service: dnsmasq
     homeassistant:
       <<: *chain-no-defaults 
-      rule: 'Host(`hass.{env.DOMAIN}`)'
+      rule: Host(`hass.{{env "DOMAIN"}}`, `home.{{ env "DOMAIN"}}`)
       service: homeassistant
     mosquitto-client:
-      <<: *chain-auth-defaults
-      rule: 'Host(`mosquitto.{env.DOMAIN}`)'
+      <<: *chain-no-defaults
+      rule: Host(`mosquitto.{{env "DOMAIN"}}`)
       service: mosquitto-client
     zigbee2mqtt:
       <<: *chain-auth-defaults
-      rule: 'Host(`zigbee.{env.DOMAIN}`)'
+      rule: Host(`zigbee.{{env "DOMAIN"}}`)
       service: zigbee2mqtt
     portainer:
       <<: *chain-no-defaults
-      rule: 'Host(`portainer.{env.DOMAIN}`)'
+      rule: Host(`portainer.{{env "DOMAIN"}}`)
       service: portainer
     homarr:
       <<: *chain-no-defaults
-      rule: 'Host(`{env.DOMAIN}`, `www.{env.DOMAIN}`)'
+      rule: Host(`{{env "DOMAIN"}}`, `www.{{env "DOMAIN"}}`)
       service: homarr
     sonarr:
       <<: *chain-no-defaults
-      rule: 'Host(`sonarr.{env.DOMAIN}`)'
+      rule: Host(`sonarr.{{env "DOMAIN"}}`)
       service: sonarr
     radarr:
       <<: *chain-no-defaults
-      rule: 'Host(`radarr.{env.DOMAIN}`)'
+      rule: Host(`radarr.{{env "DOMAIN"}}`)
       service: radarr
     bazarr:
       <<: *chain-no-defaults
-      rule: 'Host(`bazarr.{env.DOMAIN}`)'
+      rule: Host(`bazarr.{{env "DOMAIN"}}`)
       service: bazarr
     prowlarr:
       <<: *chain-no-defaults
-      rule: 'Host(`prowlarr.{env.DOMAIN}`, `indexers.{env.DOMAIN}`)'
+      rule: Host(`prowlarr.{{env "DOMAIN"}}`, `indexers.{{env "DOMAIN"}}`)
       service: prowlarr
     librespeed:
       <<: *chain-auth-defaults
-      rule: 'Host(`speed.{env.DOMAIN}`)'
+      rule: Host(`speed.{{env "DOMAIN"}}`)
       service: librespeed
     nodered:
       <<: *chain-auth-defaults 
-      rule: 'Host(`nodered.{env.DOMAIN}`)'
+      rule: Host(`nodered.{{env "DOMAIN"}}`)
       service: nodered
     znc:
       <<: *chain-no-defaults
-      rule: 'Host(`znc.{env.DOMAIN}`)'
+      rule: Host(`znc.{{env "DOMAIN"}}`)
       service: znc
     jellyfin:
       <<: *chain-no-defaults
-      rule: 'Host(`jellyfin.{env.DOMAIN}`)'
+      rule: Host(`jellyfin.{{env "DOMAIN"}}`)
       service: jellyfin
     plex:
       <<: *chain-no-defaults
-      rule: 'Host(`plex.{env.DOMAIN}`)'
+      rule: Host(`plex.{{env "DOMAIN"}}`)
       service: plex
     transmission:
       <<: *chain-auth-defaults
-      rule: 'Host(`torrent.{env.DOMAIN}`)'
+      rule: Host(`torrent.{{env "DOMAIN"}}`)
       service: transmission
     filebrowser:
       <<: *chain-no-defaults
-      rule: 'Host(`files.{env.DOMAIN}`)'
+      rule: Host(`files.{{env "DOMAIN"}}`)
       service: filebrowser
     
+  services:
+    homeassistant:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://homeassistant:8123
+        sticky:
+          cookie: true
+    mosquitto-client:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://mosquitto-client:80 
+    zigbee2mqtt:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://zigbee2mqtt:8080
+    portainer:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://portainer:9000
+    homarr:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://homarr:7575
+    sonarr:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://sonarr:8989
+    radarr:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://radarr:7878
+    bazarr:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://bazarr:6767
+    prowlarr:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://prowlarr:9696
+    librespeed:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://librespeed:80 
+    nodered:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://nodered:1880
+    znc:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://znc:6501
+    thelounge:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://thelounge:9000
+    jellyfin:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://jellyfin:8096
+    plex:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://plex:32400
+    filebrowser:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://filebrowser:8080
+    transmission:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://transmission:9091
+    dnsmasq:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://dnsmasq:80
