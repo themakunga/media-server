@@ -170,8 +170,12 @@ services:
     image: lscr.io/linuxserver/jellyfin:latest
     environment:
       <<: *umask-tz-puid-pgid
-      JELLYFIN_PublishedServerUrl: $JELLYFIN_SERVERURL 
+      JELLYFIN_PublishedServerUrl: $JELLYFIN_SERVERURL
+    devices:
+      - /dev/dri:/dev/dri
     ports:
+      - 8096:8096/tcp
+      - 8096:8096/udp
       - 1900:1900/tcp
       - 1900:1900/udp
     volumes:

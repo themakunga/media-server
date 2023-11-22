@@ -11,6 +11,8 @@
 appdata/
 !appdata/traefik/**/*
 !appdata/plex/build/**/*
+logs/**/*.txt
+
 ### Linux ###
 *~
 
