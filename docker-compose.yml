@@ -185,6 +185,7 @@ services:
   plex:
     <<: *common-keys-apps
     container_name: plex
+    hostname: plex
     # comment next line if you are using AMD acceleration 
     image: lscr.io/linuxserver/plex:latest
     # uncomment next to build and use AMD acceleration
@@ -193,7 +194,8 @@ services:
     #   dockerfile: ./amd.Dockerfile 
     environment:
       <<: *umask-tz-puid-pgid
-      VERSION: docker 
+      VERSION: docker
+      HOSTNAME: plex 
       PLEX_CLAIM: $PLEX_CLAIM
       PLEX_PGID: $PGID
       PLEX_PUID: $PUID
@@ -202,9 +204,13 @@ services:
       - /dev/dri:/dev/dri 
     ports:
       - 32400:32400/tcp
+      - 32400:32400/udp
+      - 3500:3500/tcp
+      - 3500:3500/udp
       - 8324:8324/tcp
+      - 8324:8324/udp 
       - 32469:32469/tcp
-      - 32410:3210/udp
+      - 32410:32410/udp
       - 32411:32411/udp
       - 32412:32212/udp
       - 32413:32413/udp
@@ -212,7 +218,7 @@ services:
     volumes:
       - $DAPPDATA/plex/:/config/:rw
       - $DMEDIA/tv/:/tv/:rw
-      - $DMEDIA/movies/:/movies/rw
+      - $DMEDIA/movies/:/movies/:rw
   transmission:
     <<: *common-keys-apps
     container_name: transmission

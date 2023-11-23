@@ -20,6 +20,7 @@ http:
       entrypoints: https
       rule: HostRegexp(`{host:.+}`)
       middlewares: redirect-to-https@file
+      service: http-catch-all
     traefik:
       entrypoints: https
       rule: 'Host(`traefik.{{env "DOMAIN"}}`)'
@@ -27,7 +28,8 @@ http:
         certresolver: dns-cloudflare
         domains:
           - main: '{{env "DOMAIN"}}'
-            sans: '*.{{env "DOMAIN"}}'
+            sans: 
+              - '*.{{env "DOMAIN"}}'
       service: api@internal
       middlewares: chain-basic-auth@file
     dnsmasq:
@@ -100,6 +102,10 @@ http:
       service: filebrowser
     
   services:
+    http-catch-all: 
+      loadbalancer:
+        servers:
+          - url: http://traefik:80 
     homeassistant:
       loadbalancer:
         <<: *x-healthcheck

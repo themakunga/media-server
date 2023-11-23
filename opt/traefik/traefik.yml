@@ -26,7 +26,7 @@ providers:
 certificatesResolvers:
   dns-cloudflare:
     acme:
-      email: {env.CLOUDFLARE_EMAIL}
+      email: nmartinezv@icloud.com
       storage: /acme.json
       dnsChallenge:
         provider: cloudflare 
@@ -54,11 +54,11 @@ entryPoints:
       trustedIPS: [ {env.TRUSTED_IPS} ]
     http:
       tls:
-        options: tls-ops@file 
+        options: tls-opts@file
         certresolver: dns-cloudflare
         domains:
-          - main: {env.DOMAIN}
-            sans: "*.{{env 'DOMAIN'}}"
+          - main: amandas.casa
+            sans: !!str '*.amandas.casa'
   traefik:
     address: !!str ':8080'
   

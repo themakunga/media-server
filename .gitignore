@@ -9,8 +9,6 @@
 *.pem
 **/node_modules/
 appdata/
-!appdata/traefik/**/*
-!appdata/plex/build/**/*
 logs/**/*.txt
 
 ### Linux ###
