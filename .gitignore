@@ -2,6 +2,10 @@
 ## Edit at https://www.toptal.com/developers/gitignore?templates=windows,linux,macos,vim,visualstudiocode,dotenv
 
 ### dotenv ###
+
+secrets/
+secrets.yaml
+secrets.yml
 .env
 .htpasswd
 **/acme.json

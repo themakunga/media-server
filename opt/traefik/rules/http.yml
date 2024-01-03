@@ -38,7 +38,7 @@ http:
       service: dnsmasq
     homeassistant:
       <<: *chain-no-defaults 
-      rule: Host(`hass.{{env "DOMAIN"}}`, `home.{{ env "DOMAIN"}}`)
+      rule: Host(`hass.{{env "DOMAIN"}}`)
       service: homeassistant
     mosquitto-client:
       <<: *chain-no-defaults
@@ -70,7 +70,7 @@ http:
       service: bazarr
     prowlarr:
       <<: *chain-no-defaults
-      rule: Host(`prowlarr.{{env "DOMAIN"}}`, `indexers.{{env "DOMAIN"}}`)
+      rule: Host(`prowlarr.{{env "DOMAIN"}}`)
       service: prowlarr
     librespeed:
       <<: *chain-auth-defaults
@@ -100,7 +100,15 @@ http:
       <<: *chain-no-defaults
       rule: Host(`files.{{env "DOMAIN"}}`)
       service: filebrowser
-    
+    adminer:
+      <<: *chain-no-defaults
+      rule: Host(`database.{{env "DOMAIN"}}`)
+      service: adminer
+    gpt:
+      <<: *chain-no-defaults
+      rule: Host(`gpt.{{env "DOMAIN"}}`)
+      service: gpt
+
   services:
     http-catch-all: 
       loadbalancer:
@@ -198,3 +206,13 @@ http:
         <<: *x-healthcheck
         servers:
           - url: http://dnsmasq:80
+    adminer:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://adminer:8080 
+    gpt:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://gpt:3000
