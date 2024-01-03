@@ -84,6 +84,10 @@ http:
       <<: *chain-no-defaults
       rule: Host(`znc.{{env "DOMAIN"}}`)
       service: znc
+    irc:
+      <<: *chain-no-defaults
+      rule: Host(`irc.{{env "DOMAIN"}}`)
+      service: irc 
     jellyfin:
       <<: *chain-no-defaults
       rule: Host(`jellyfin.{{env "DOMAIN"}}`)
@@ -176,6 +180,11 @@ http:
         <<: *x-healthcheck
         servers:
           - url: http://znc:6501
+    irc:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://thelounge:9000 
     thelounge:
       loadbalancer:
         <<: *x-healthcheck
