@@ -2,7 +2,9 @@
 ## Edit at https://www.toptal.com/developers/gitignore?templates=windows,linux,macos,vim,visualstudiocode,dotenv
 
 ### dotenv ###
-
+*.db.*
+*.db 
+*.db-*
 secrets/
 secrets.yaml
 secrets.yml
