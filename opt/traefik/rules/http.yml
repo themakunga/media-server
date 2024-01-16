@@ -112,6 +112,10 @@ http:
       <<: *chain-no-defaults
       rule: Host(`gpt.{{env "DOMAIN"}}`)
       service: gpt
+    netdata:
+      <<: *chain-auth-defaults
+      rule: Host(`monitor.{{ env "DOMAIN" }}`)
+      service: netdata
 
   services:
     http-catch-all: 
@@ -214,7 +218,7 @@ http:
       loadbalancer:
         <<: *x-healthcheck
         servers:
-          - url: http://dnsmasq:80
+          - url: http://pihole:80
     adminer:
       loadbalancer:
         <<: *x-healthcheck
@@ -225,3 +229,8 @@ http:
         <<: *x-healthcheck
         servers:
           - url: http://gpt:3000
+    netdata:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://netdata:19999

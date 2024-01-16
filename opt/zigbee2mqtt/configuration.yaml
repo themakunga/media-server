@@ -32,3 +32,12 @@ advanced:
 device_options:
   legacy: false
 homeassistant: true
+devices:
+  '0x54ef4410009141e6':
+    friendly_name: Entrance
+  '0x54ef44100091550f':
+    friendly_name: Table
+  '0x54ef4410009130f2':
+    friendly_name: Living Room
+  '0x00178801090570ae':
+    friendly_name: Bedroom

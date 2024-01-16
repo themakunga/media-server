@@ -66,23 +66,46 @@ services:
   ## ---------- DNS Service ---------- ##
   dnsmasq:
     <<: *common-keys-core
-    container_name: dnsmasq
-    image: jpillora/dnsmasq:latest
-    environment:
-      <<: *default-tz-puid-pgid
-      HTTP_USER: $DNSMASQ_USER
-      HTTP_PASS: $DNSMASQ_PASS
-    cap_add:
-      - NET_ADMIN
-    logging:
-      options:
-        max-size: 100m
+    container_name: dnsmasq 
+    build:
+      context: $DCUSTOM/dnsmasq
+      dockerfile: Dockerfile
     ports:
       - 53:53/tcp
-      - 53:53/udp
+      - 53:53/udp 
+    environment:
+      <<: *default-tz-puid-pgid
+    cap_add:
+      - NET_ADMIN
     volumes:
-      - $DOPT/dnsmasq/dnsmasq.d/:/etc/dnsmasq.d/:rw
       - $DOPT/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro 
+      - $DOPT/dnsmasq/dnsmasq.d/:/etc/dnsmasq.d/:ro 
+      - $DLOGS/dnsmasq/:/var/logs/:rw
+  netdata:
+    <<: *common-keys-core
+    container_name: netdata
+    hostname: monitor.amandas.casa
+    image: netdata/netdata:latest
+    pid: host 
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      <<: *default-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/netdata/config:/etc/netdata:rw
+      - $DAPPDATA/netdata/lib:/var/lib/netdata:rw
+      - $DSHARED/netdata/cache:/var/cache/netdata:rw
+      - /etc/passwd:/host/etc/passwd:ro 
+      - /etc/group:/host/etc/group:ro 
+      - /etc/localtime:/host/etc/localtime:ro 
+      - /proc:/host/proc:ro 
+      - /sys:/host/sys:ro 
+      - /etc/os-release:/host/etc/os-release:ro 
+      - /var/log:/host/var/log:ro 
+      - /var/run/docker.sock:/var/run/docker.sock:ro 
 
   ## ---------- TCP/UDP Services ---------- ##
   iventoy:
@@ -245,6 +268,7 @@ services:
       - $DSHARED/watch/:/watch/:rw
 
   ## ---------- Management ---------- ##
+
   homarr:
     <<: *common-keys-apps
     container_name: homarr
