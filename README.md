@@ -6,6 +6,10 @@ _creado para mantener organizados los servicios que son mas comunes en un labora
 
 ## Pre Requisitos
 
+### Software
+
+Estos servicios estan disponibles en contenedores docker, por lo cual es necesario tener la ultima version vigente del mismo, en especial porque viene con el plugin de `compose` , el archivo esta enfocado en la version `3.9` del manifiesto de `docker compose`, por lo demas es agnostico a el sistema operativo que esta, pero siempre se recomienda usar algun servidor unix para el manejo de permisos a nivel de usuario.
+
 ### Cloudflare DNS
 
 En cloudflare se deben crear 2 registros DNS, un tipo `A` con la IP publica de tu red,  se puede obtener con el siguiente comando `curl icanhazip.com` el numero obtenido tiene que ser al registro `A` al DNS base, posteriormente se debe crear un registro `CNAME` con un wildcard al dominio ejemplo: `*.example.tld`. Se debe tener en cuenta que hay que cambiar el `Proxy status` de Cloudflare en esos registros a **DNS only** 
@@ -93,7 +97,206 @@ chmod 600 $DAPPDATA/traefik/acme.json
 
 si el directorio no esta creado, crearlo.
 
+### Archivo estatico de Traefik
+
+`Traefik` tiene 2 tipos de configuracion, la estatica y la dinamica, la primera es la core del servicio en si, la segunda corresponde a los balanceadores y otras cosas que seran especificadas en su momento, lamentablemente no todos las variables del archivo estatico pueden ser parametrizadas para correr correctamente `Traefik`, pero se tiene que crear un archivo estatico en la siguiente ruta: `$DOPT/traefik/traefik.yml` , este debe traer la siguiente configuracion:
+
+```yaml
+api:
+  insecure: true
+  dashboard: true
+
+log:
+  filepath: /logs/traefik.log
+  level: {env.LOG_LEVEL}
+
+accessLog:
+  filePath: /log/access.log
+  bufferingSize: 100
+  filters:
+    statusCodes: 204-299,400-499,500-599
+
+providers:
+  docker:
+    endpoint: unix:///var/run/docker.sock
+    exposedByDefault: false
+    watch: true
+    network: proxy
+    swarmMode: false
+  file:
+    directory: /rules
+    watch: true
+
+certificatesResolvers:
+  dns-cloudflare:
+    acme:
+      email: '' # add your dns email. must be the same as dot env file
+      storage: /acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - 1.1.1.1:53
+          - 1.1.0.0.1:53
+        delayBeforeCheck: 90
+
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+entryPoints:
+  http:
+    address: !!str ':80'
+    http:
+      redirections:
+        entrypoint:
+          to: https
+          scheme: https
+          permanent: true
+  https:
+    address: !!str ':443'
+    forwardedHeaders:
+      trustedIPS: [ {env.TRUSTED_IPS} ]
+    http:
+      tls:
+        options: tls-opts@file
+        certresolver: dns-cloudflare
+        domains:
+          - main: !!str '' # must be inputed as example.tld
+            sans: !!str '' # must be inputed as *.example.tld
+  traefik:
+    address: !!str ':8080'
+```
+
+hay que tener en consideracion que en la linea 29 se debe introducir el mismo email de la cuenta de cloudflare, y en las lineas 60 y 61 los registros DNS `A` y `CNAME` respectivamente, extrañamente, todo lo demas puede pasar por parametros o variables de entorno del mismo contenedor.
+
+### Archivo DNSmasq
+
+en la ruta `$DOPT/dnsmasq/` se encuentra el archivo `dnsmasq.conf` el cual debe ser actualizado para que incluya informacion escencial para el funcionamiento de los servicios.
+
+```bash
+port=53
+domain-needed
+bogus-priv
+
+no-hosts
+
+no-resolv
+strict-order
+server=8.8.8.8
+server=8.8.4.4
+server=1.1.1.1
+server=1.0.0.1
+
+expand-hosts
+# changed domain from .docker to .dev.home
+domain=
+
+#log all dns queries
+log-queries
+
+address=
+address=
+```
+
+en la linea 15 se debe agregar el dominio del registro A del DNS
+
+```bash
+domain=example.tld
+```
+
+en las ultimas dos lineas se deben agregar el dominio y las ip de la maquina host que va a tener los servicios, la IP debe ser de la red local,  esta dos veces por que se recomienda tener tanto la ipv4 como la ipv6, un ejemplo seria:
+
+```bash
+address=/example.tld/192.168.1.2
+address=/example.tld/aaaa::bbbb:cccc:dddd:eeee
+
+```
+
+el uso de las direcciones ipv6 resuelve los provemas de conectividad que podrian pasar con versiones nuevas de safari y iOS ya que el private relay funciona a nivel de ipv6, segun documentacion de DNSmasq
+
+### Pull y build de contenedores
+
+Si, antes de usar los servicios se debe realizar un pull de los contenedores, esto debido a que no tenemos configurados el servidor DNS local.
+
+```bash
+docker compose pull # para traer todos los servicios y dejarlos disponibles para su uso 
+docker compose build # para crear los contenedores que no son traidos desde el hub de docker (necesario para el servidor DNSmasq)
+```
+
+_esto tambien es util para poder tener los servicios de `Plex` que va a ser descrito mas adelante._
+
+### Servidor DNSmasq
+
+para que todo resulte desde la red, se ha disponibilizado un servidor DNSmasq que resuelve los dominios y subdominios creados por el balanceador `Traefik` lo que si, es un poco trabajoso de ponerlo a ejecutar desde primera instancia, se deben seguir los siguientes pasos, siempre y cuando tu router permita configurar el servidor DNS por defecto
+
+#### Pasos a seguir
+
+##### levantar los servicios y la red privada de los contenedores
+
+algo tan simple como ejecutar 
+
+```bash
+docker compose up -d # -d para que sea en modo detached, donde podemos cerrar la consola posteriormente sin perder la ejecucion
+```
+
+##### configurar servidor dns
+
+esto varia de router en router, tienes que ver en algun tutorial como cambiar esa configuracion, el servicio de DNS debe ser solo uno y debe apuntar a la IP interna del equipo donde estan activos los servicios. Se recomienda usar IP estatica o reservada para ese equipo .
+
+##### puertos
+
+para el correcto funcionamiento del servicio, en el servidor deben estar habilitados los puertos 53/tcp, 53/udp, ademas de los standard http y https (80, 443) y los especiales para cada servicio que seran listados en cada descripcion de ellos.
+
+El servicio DNSmasq esta configurado para que resuelva las direcciones internas, por lo que si necesita resolver alguna direccion fuera de la red, este va a redireccionar a los servidores de cloudflare y google (al azar) para obtener las paginas web. en si esto tambien es un foco de privacidad, ya que de esta manera tu ISP no deberia tener registro en tu router de las paginas que visitan en tu red. ademas asi puedes visitar los dominios de los servicios desde cualquier equipo en tu red local y si deseas configurar algo mas es mas facil un DNS, porque las ips de los contenedores, que si bien estan expuestas, estas cambian efimeramente junto al contendor (si lo reinicias es bastante probable que no vuelva a ser la misma ip).
+
+##### reiniciar contendores
+
+si, se deben reiniciar los contenedores docker, para que tomen la configuracion del DNSmasq, por lo mismo primero se piden todos estos pasos, porque al tener abajo dnsmasq no puedes hacer pull o build de los contenedores, ya que intentan primero resolver dns a un servidor que no existe.
+
+### Nota
+
+si tienes un servidor dns aparte, puedes omitir todos estos pasos y pasar directamente a levantar y configurar tus servicios.
 
 
 
+# Servicios
+
+Los servicios disponibles listados son:
+
+- Traefik, Servicio de proxy reverso para contendores docker
+- DNSmasq, resolvedor dns (ademas de servidor DHCP, pero esta desabilitado por el momento)
+- Netdata, monitor de servicios tanto de la maquina host, como los contenedores
+- InventoyPXE, exponer ISO para hacer instalacion de red de sistemas operativos
+- Mosquitto, colas en protocolo mqtt
+- NodeRed, webservice para conectar y servir de distintas solucuiones de red
+- Sonarr, mapeador y grabber de series de tv
+- Radarr, mapeador y grabber de peliculas
+- Bazarr, buscador automatico de subtitulos
+- Prowlarr, manejador de indices para multimedia
+- Jellyfin, servidor opensource multimedia, ademas protocolo DNLA
+- Plex, administrador de libreria y servidor multimedia
+- Transmission, gestor de descargas torrent
+- Homarr, homepage manager,
+- Portainer, administrador de contenedores docker web
+- Filebrowser, gestor de archivos en directorios,desde la web
+- Watchtower, administrador y actualizador de contendores docker
+- Adminer, administrador minimalista de bases de datos MariaDB/MySQL
+- Moquitto-client, cliente broker de colas mqtt
+- zigbee2mqtt, administrador de conector protocolo zigbee para domotica
+- Homeassistant, administrador de multiples servicios enfocados a domotica, ademas de conectarse a asistentes como alexa y google
+- LibreSpeed, medidor de velocidad de internet opensource
+- ZNC, bouncer para redes IRC
+- TheLounge, cliente IRC web
+- MariaDB, base de datos relacional
+- MongoDB, base de datos no relacional
+
+
+
+### Traefik
+
+| Version | Puertos Expuestos     | Puntos de montaje                                            | Archivo de configuracion                                     | Variables de entorno                                         |      |
+| ------- | --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ---- |
+| 2.10.4  | 80<br />443<br />8080 | - /var/run/docker.sock:/var/run/docker.sock:ro<br/>- $DAPPDATA/traefik/acme.json:/acme.json:rw<br/>- $DLOGS/traefik/:/logs/:rw<br/>- $DSHARED/:/shared/:rw | - $DOPT/traefik/traefik.yml:/etc/traefik/traefik.yml:ro<br/>- $DOPT/traefik/rules/:/rules/:ro<br/> | DOMAIN<br/>SUBNET<br/>LOCAL_IPS<br/>CLOUDFLARE_IPS<br/>TRAEFIK_VERSION<br/>CLOUDFLARE_API_KEY<br/>CLOUDFLARE_TOKEN<br/>CLOUDFLARE_EMAIL<br/>LETSENCRYPT_EMAIL |      |
+
+\
 
