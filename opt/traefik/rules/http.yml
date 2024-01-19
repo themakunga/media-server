@@ -11,8 +11,8 @@ x-chain-no-defaults: &chain-no-defaults
 x-healthcheck: &x-healthcheck
   healthCheck:
     path: / 
-    interval: 30s 
-    timeout: 5s 
+    interval: 10s 
+    timeout: 3s 
 
 http:
   routers:

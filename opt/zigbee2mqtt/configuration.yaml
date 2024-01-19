@@ -1,6 +1,6 @@
 permit_join: false
 mqtt:
-  base_topic: '!secrets.yaml base_topic'
+  base_topic: zigbee2mqtt
   server: '!secrets.yaml server'
   user: '!secrets.yaml user'
   password: '!secrets.yaml password'
@@ -29,15 +29,18 @@ advanced:
   homeassistant_legacy_entity_attributes: false
   legacy_api: false
   legacy_availability_payload: false
+cache_state: false
 device_options:
   legacy: false
 homeassistant: true
 devices:
   '0x54ef4410009141e6':
-    friendly_name: Entrance
+    friendly_name: Entrance Door
   '0x54ef44100091550f':
     friendly_name: Table
+    description: table light
   '0x54ef4410009130f2':
     friendly_name: Living Room
   '0x00178801090570ae':
     friendly_name: Bedroom
+groups: {}
