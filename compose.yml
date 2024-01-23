@@ -148,6 +148,20 @@ services:
       - 1880:1880/udp
     volumes:
       - $DAPPDATA/nodered/:/data/:rw
+  cups:
+    <<: *common-keys-apps
+    container_name: cups
+    image: anujdatar/cups
+    environment:
+      <<: *default-tz-puid-pgid
+      CUPSADMIN: $CUPSADMIN
+      CUPSPASSWORD: $CUPSPASSWORD
+    ports:
+      - 631:631
+    volumes:
+      - $DAPPDATA/cups/:/etc/cups:rw
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
   #   <<: *common-keys-dns-core
   #   container_name: ollama
   #   image: ollama/ollama:latest
@@ -266,6 +280,15 @@ services:
       - $DAPPDATA/transmission/:/config/:rw
       - $DMEDIA/downloads/:/downloads/:rw
       - $DSHARED/watch/:/watch/:rw
+  jdownloader2:
+    <<: *common-keys-apps
+    container_name: jdownloader2
+    image: jlesage/jdownloader-2
+    environment:
+      <<: *default-tz-puid-pgid
+    volumes:
+      - $DAPPDATA/jdownloader2/:/config:rw
+      - $DMEDIA/downloads/:/output:rw
 
   ## ---------- Management ---------- ##
 

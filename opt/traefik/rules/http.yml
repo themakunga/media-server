@@ -80,6 +80,10 @@ http:
       <<: *chain-auth-defaults 
       rule: Host(`nodered.{{env "DOMAIN"}}`)
       service: nodered
+    cups:
+      <<: *chain-no-defaults
+      rule: Host(`print.{{ env "DOMAIN" }}`)
+      service: cups
     znc:
       <<: *chain-no-defaults
       rule: Host(`znc.{{env "DOMAIN"}}`)
@@ -100,6 +104,10 @@ http:
       <<: *chain-auth-defaults
       rule: Host(`torrent.{{env "DOMAIN"}}`)
       service: transmission
+    jdownloader2:
+      <<: *chain-no-defaults
+      rule: Host(`downloader.{{ env "DOMAIN" }}`)
+      service: jdownloader2
     filebrowser:
       <<: *chain-no-defaults
       rule: Host(`files.{{env "DOMAIN"}}`)
@@ -179,6 +187,11 @@ http:
         <<: *x-healthcheck
         servers:
           - url: http://nodered:1880
+    cups:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://cups:631
     znc:
       loadbalancer:
         <<: *x-healthcheck
@@ -214,6 +227,11 @@ http:
         <<: *x-healthcheck
         servers:
           - url: http://transmission:9091
+    jdownloader2:
+      loadbalancer:
+        <<: *x-healthcheck
+        servers:
+          - url: http://jdownloader2:5800
     dnsmasq:
       loadbalancer:
         <<: *x-healthcheck
