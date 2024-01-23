@@ -5,10 +5,11 @@
 */traefik/traefik.yml
 */zigbee2mqtt/configuration.yaml
 *.db.*
-*.db 
+*.db
 *.db-*
 secrets/
 secrets.yaml
+shared/
 secrets.yml
 .env
 .htpasswd
