@@ -13,14 +13,6 @@ networks:
 
 ########################## EXTENSION FIELDS ########################
 
-x-dns: &dns-core
-  dns:
-    - 192.168.4.45
-    - 8.8.8.8
-    - 8.8.4.4 
-    - 1.1.1.1 
-    - 1.0.0.1
-
 x-environment: &default-tz-puid-pgid
   TZ: $TZ
   PUID: $PUID
@@ -33,60 +25,56 @@ x-environment-umask: &umask-tz-puid-pgid
 x-common-keys-core: &common-keys-core
   networks:
     - proxy
-  security_opt:
-    - no-new-privileges:true
   restart: always
-
-x-common-keys-with-dns-core: &common-keys-dns-core
-  <<: [*common-keys-core, *dns-core]
 
 x-common-keys-apps: &common-keys-apps
   networks:
     - proxy
-  security_opt:
-    - no-new-privileges:true
   restart: unless-stopped
-  <<: *dns-core
 
 x-common-keys-media: &common-keys-media
   networks:
     - proxy
-  security_opt:
-    - no-new-privileges:true
-  restart: no 
+  restart: no
 
 x-port-list: &port-list
   ports:
     - 80:80
-    - 443:443
-    - 8080:8080 # traefik api 
+    - 8080:8080 # traefik api
 
 ############################ SERVICES ###############################
 services:
-  ## ---------- DNS Service ---------- ##
-  dnsmasq:
+  homeassistant:
     <<: *common-keys-core
-    container_name: dnsmasq 
-    build:
-      context: $DCUSTOM/dnsmasq
-      dockerfile: Dockerfile
-    ports:
-      - 53:53/tcp
-      - 53:53/udp 
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
     environment:
       <<: *default-tz-puid-pgid
-    cap_add:
-      - NET_ADMIN
+      HC_IGNORE_SSL: true
+    privileged: true
+    ports:
+      - 8123:8123/tcp
+      - 8124:8124/tcp
     volumes:
-      - $DOPT/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf:ro 
-      - $DOPT/dnsmasq/dnsmasq.d/:/etc/dnsmasq.d/:ro 
-      - $DLOGS/dnsmasq/:/var/logs/:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - $DOPT/homeassistant/themes/:/config/themes/:ro
+      - $DOPT/homeassistant/www/:/config/www/:ro
+      - $DOPT/homeassistant/configuration.yaml:/config/configuration.yaml:ro
+      - $DOPT/homeassistant/automations.yaml:/config/automations.yaml:ro
+      - $DOPT/homeassistant/http.yaml:/config/http.yaml:ro
+      - $DOPT/homeassistant/mqtt.yaml:/config/mqtt.yaml:ro
+      - $DOPT/homeassistant/recorder.yaml:/config/recorder.yaml:ro
+      - $DOPT/homeassistant/scenes.yaml:/config/scenes.yaml:rw
+      - $DOPT/homeassistant/scripts.yaml:/config/scripts.yaml:ro
+      - $DAPPDATA/homeassistant/:/config/:rw
+      - $DSECRETS/homeassistant.yaml:/config/secrets.yaml:ro
   netdata:
     <<: *common-keys-core
     container_name: netdata
     hostname: monitor.amandas.casa
     image: netdata/netdata:latest
-    pid: host 
+    pid: host
     cap_add:
       - SYS_PTRACE
       - SYS_ADMIN
@@ -94,37 +82,25 @@ services:
       - apparmor:unconfined
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 8086:19999
     volumes:
       - $DAPPDATA/netdata/config:/etc/netdata:rw
       - $DAPPDATA/netdata/lib:/var/lib/netdata:rw
       - $DSHARED/netdata/cache:/var/cache/netdata:rw
-      - /etc/passwd:/host/etc/passwd:ro 
-      - /etc/group:/host/etc/group:ro 
-      - /etc/localtime:/host/etc/localtime:ro 
-      - /proc:/host/proc:ro 
-      - /sys:/host/sys:ro 
-      - /etc/os-release:/host/etc/os-release:ro 
-      - /var/log:/host/var/log:ro 
-      - /var/run/docker.sock:/var/run/docker.sock:ro 
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/host/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   ## ---------- TCP/UDP Services ---------- ##
-  iventoy:
-    <<: *common-keys-core
-    container_name: iventoy
-    image: thedrobe/iventoy-docker:latest
-    environment:
-      <<: *default-tz-puid-pgid
-    privileged: true
-    stop_signal: SIGINT
-    ports:
-      - 2600:2600/tcp
-      - 2600:2500/udp
-    volumes:
-      - $DMEDIA/iso/:/app/iso/:ro
-      - $DLOGS/ventoy/:/app/log/:rw
   mosquitto:
     <<: *common-keys-core
-    container_name: mosquitto 
+    container_name: mosquitto
     image: eclipse-mosquitto:latest
     environment:
       <<: *default-tz-puid-pgid
@@ -132,13 +108,13 @@ services:
       - 1883:1883/tcp
       - 1883:1883/udp
       - 9001:9001/tcp
-      - 9001:9001/udp 
+      - 9001:9001/udp
     volumes:
       - $DOPT/mosquitto/:/mosquitto/config/:rw
       - $DAPPDATA/mosquitto/:/mosquitto/data/:rw
       - $DLOGS/mosquitto/:/mosquitto/log/:rw
   nodered:
-    <<: *common-keys-dns-core
+    <<: *common-keys-core
     container_name: nodered
     image: nodered/node-red:latest
     environment:
@@ -162,15 +138,6 @@ services:
       - $DAPPDATA/cups/:/etc/cups:rw
     devices:
       - /dev/bus/usb:/dev/bus/usb
-  #   <<: *common-keys-dns-core
-  #   container_name: ollama
-  #   image: ollama/ollama:latest
-  #   environment: 
-  #     <<: *default-tz-puid-pgid
-  #     OLLAMA_MODELS: /ollama/models
-  #   volumes:
-  #     - $DAPPDATA/ollama/models:/ollama/models:rw
-  #     - $DOPT/ollama/Modelfile:/ollama/Modelfile:ro 
   ## ---------- Media Center ---------- ##
   sonarr:
     <<: *common-keys-apps
@@ -178,6 +145,8 @@ services:
     image: lscr.io/linuxserver/sonarr:latest
     environment:
       <<: *umask-tz-puid-pgid
+    ports:
+      - 8989:8989
     volumes:
       - $DAPPDATA/sonarr/:/config/:rw
       - $DMEDIA/tv/:/tv/:rw
@@ -188,6 +157,8 @@ services:
     image: lscr.io/linuxserver/radarr:latest
     environment:
       <<: *umask-tz-puid-pgid
+    ports:
+      - 7878:7878
     volumes:
       - $DAPPDATA/radarr/:/config/:rw
       - $DMEDIA/movies/:/movies/:rw
@@ -198,6 +169,8 @@ services:
     image: lscr.io/linuxserver/bazarr:latest
     environment:
       <<: *umask-tz-puid-pgid
+    ports:
+      - 6767:6767
     volumes:
       - $DAPPDATA/bazarr/:/config/:rw
       - $DMEDIA/tv/:/tv/:rw
@@ -208,6 +181,8 @@ services:
     image: lscr.io/linuxserver/prowlarr:latest
     environment:
       <<: *umask-tz-puid-pgid
+    ports:
+      - 9696:9696
     volumes:
       - $DAPPDATA/prowlarr/:/config/:rw
   jellyfin:
@@ -232,12 +207,12 @@ services:
     <<: *common-keys-apps
     container_name: plex
     hostname: plex
-    # comment next line if you are using AMD acceleration 
+    # comment next line if you are using AMD acceleration
     image: plexinc/pms-docker
     # uncomment next to build and use AMD acceleration
     # build:
     #   context: $DCUSTOM/plex
-    #   dockerfile: ./amd.Dockerfile 
+    #   dockerfile: ./amd.Dockerfile
     environment:
       <<: *umask-tz-puid-pgid
       VERSION: latest
@@ -254,7 +229,7 @@ services:
       - 3500:3500/tcp
       - 3500:3500/udp
       - 8324:8324/tcp
-      - 8324:8324/udp 
+      - 8324:8324/udp
       - 32469:32469/tcp
       - 32410:32410/udp
       - 32411:32411/udp
@@ -286,6 +261,8 @@ services:
     image: jlesage/jdownloader-2
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 5800:5800
     volumes:
       - $DAPPDATA/jdownloader2/:/config:rw
       - $DMEDIA/downloads/:/output:rw
@@ -298,12 +275,14 @@ services:
     image: ghcr.io/ajnart/homarr:latest
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 80:7575
     volumes:
       - $DAPPDATA/homarr/config/:/app/data/config/:rw
       - $DAPPDATA/homarr/data/:/data:rw
       - $DAPPDATA/homarr/icons/:/app/public/icons/:rw
   portainer:
-    <<: *common-keys-dns-core
+    <<: *common-keys-core
     container_name: portainer
     image: portainer/portainer-ce:latest
     environment:
@@ -312,31 +291,17 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - $DAPPDATA/portainer/:/data/:rw
-  traefik:
-    <<: [*common-keys-dns-core, *port-list]
-    container_name: traefik
-    image: traefik:latest
-    environment:
-      <<: *default-tz-puid-pgid
-      CF_API_EMAIL: $CLOUDFLARE_EMAIL
-      CF_API_KEY: $CLOUDFLARE_API_KEY
-      DOMAIN: $DOMAIN
-      TRUSTED_IPS: $CLOUDFLARE_IPS,$LOCAL_IPS
-      LOG_LEVEL: $LOG_LEVEL 
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - $DAPPDATA/traefik/acme.json:/acme.json:rw
-      - $DOPT/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - $DOPT/traefik/rules/:/rules/:ro
-      - $DLOGS/traefik/:/logs/:rw
-      - $DSHARED/:/shared/:rw
+    ports:
+      - 9000:9000
   filebrowser:
-    <<: *common-keys-core 
+    <<: *common-keys-core
     container_name: filebrowser
     image: hurlenko/filebrowser:latest
     environment:
       <<: *default-tz-puid-pgid
     user: $PUID:$PGID
+    ports:
+      - 8081:8080
     volumes:
       - $DMEDIA/:/data/:rw
       - $DAPPDATA/filebrowser/:/config/:rw
@@ -358,18 +323,12 @@ services:
     <<: *common-keys-core
     container_name: adminer
     image: adminer:latest
+    ports:
+      - 8082:8080
     environment:
       <<: *default-tz-puid-pgid
       ADMINER_DEFAULT_SERVER: $ADMINER_DEFAULT_SERVER
-      
-  # gpt: 
-  #   <<: *common-keys-core
-  #   container_name: gpt 
-  #   image: ghcr.io/ivanfioravanti/chatbot-ollama:main 
-  #   environment:
-  #     <<: *default-tz-puid-pgid
-  #     DEFAULT_MODEL: GlaDOS
-  #     OLLAMA_HOST: http://ollama:11434
+
   ## ---------- Home Automatization ---------- ##
   mosquitto-client:
     <<: *common-keys-core
@@ -377,6 +336,8 @@ services:
     image: emqx/mqttx-web:latest
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 8083:80
   zigbee2mqtt:
     <<: *common-keys-core
     container_name: zigbee2mqtt
@@ -385,48 +346,27 @@ services:
       <<: *default-tz-puid-pgid
     devices:
       - /dev/ttyUSB0:/dev/ttyUSB0
+    ports:
+      - 8084:8080
     volumes:
       - $DOPT/zigbee2mqtt/configuration.yaml:/app/data/configuration.yaml:rw
       - /run/udev:/run/udev:ro
       - $DAPPDATA/zigbee2mqtt/:/app/data/:rw
-      - $DSCRIPTS/searchtty.sh:/app/searchtty.sh:ro 
-      - $DSECRETS/zigbee2mqtt.yaml:/app/data/secrets.yaml:ro 
-  homeassistant:
-    <<: *common-keys-dns-core
-    container_name: homeassistant
-    image: ghcr.io/home-assistant/home-assistant:stable
-    environment:
-      <<: *default-tz-puid-pgid
-      HC_IGNORE_SSL: true
-    privileged: true
-    ports: 
-      - 8123:8123/tcp
-      - 8124:8124/tcp
-    volumes:
-      - /etc/localtime:/etc/localtime:ro 
-      - /run/dbus:/run/dbus:ro 
-      - $DOPT/homeassistant/themes/:/config/themes/:ro 
-      - $DOPT/homeassistant/www/:/config/www/:ro 
-      - $DOPT/homeassistant/configuration.yaml:/config/configuration.yaml:ro 
-      - $DOPT/homeassistant/automations.yaml:/config/automations.yaml:ro 
-      - $DOPT/homeassistant/http.yaml:/config/http.yaml:ro 
-      - $DOPT/homeassistant/mqtt.yaml:/config/mqtt.yaml:ro 
-      - $DOPT/homeassistant/recorder.yaml:/config/recorder.yaml:ro 
-      - $DOPT/homeassistant/scenes.yaml:/config/scenes.yaml:rw 
-      - $DOPT/homeassistant/scripts.yaml:/config/scripts.yaml:ro 
-      - $DAPPDATA/homeassistant/:/config/:rw
-      - $DSECRETS/homeassistant.yaml:/config/secrets.yaml:ro
-  
+      - $DSCRIPTS/searchtty.sh:/app/searchtty.sh:ro
+      - $DSECRETS/zigbee2mqtt.yaml:/app/data/secrets.yaml:ro
+
   ## ---------- Tools ---------- ##
   librespeed:
-    <<: *common-keys-dns-core
+    <<: *common-keys-core
     container_name: librespeed
     image: lscr.io/linuxserver/librespeed:latest
     environment:
       <<: *default-tz-puid-pgid
+    ports:
+      - 8085:80
   znc:
-    <<: *common-keys-dns-core
-    container_name: znc 
+    <<: *common-keys-core
+    container_name: znc
     image: znc
     environment:
       <<: *default-tz-puid-pgid
@@ -435,16 +375,8 @@ services:
       - 6502:6502/tcp
     volumes:
       - $DAPPDATA/znc:/znc-data:rw
-  thelounge:
-    <<: *common-keys-dns-core
-    container_name: thelounge
-    image: lscr.io/linuxserver/thelounge:latest
-    environment:
-      <<: *default-tz-puid-pgid
-    volumes:
-      - $DAPPDATA/thelounge/:/config/:rw 
   mariadb:
-    <<: *common-keys-dns-core
+    <<: *common-keys-core
     container_name: mariadb
     image: mariadb
     environment:
@@ -454,18 +386,18 @@ services:
       MYSQL_USERNAME: $MARIADB_BASE_USERNAME
       MYSQL_PASSWORD: $MARIADB_BASE_PASSWORD
     ports:
-      - 3306:3306/tcp 
+      - 3306:3306/tcp
     volumes:
-      - $DAPPDATA/mariadb/:/var/lib/mysql 
+      - $DAPPDATA/mariadb/:/var/lib/mysql
   mongodb:
     <<: *common-keys-core
     container_name: mongodb
     image: mongo
     environment:
       <<: *default-tz-puid-pgid
-      MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USERNAME 
-      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD 
-    ports: 
-      - 27017:27017/tcp 
+      MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USERNAME
+      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+    ports:
+      - 27017:27017/tcp
     volumes:
-      - $DAPPDATA/mongodb/:/data/db 
+      - $DAPPDATA/mongodb/:/data/db
