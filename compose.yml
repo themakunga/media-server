@@ -127,7 +127,9 @@ services:
   cups:
     <<: *common-keys-apps
     container_name: cups
-    image: anujdatar/cups
+    build:
+      context: $DCUSTOM/cups
+      dockerfile: Dockerfile
     environment:
       <<: *default-tz-puid-pgid
       CUPSADMIN: $CUPSADMIN
@@ -135,9 +137,12 @@ services:
     ports:
       - 631:631
     volumes:
-      - $DAPPDATA/cups/:/etc/cups:rw
+      - /var/run/dbus/:/var/run/dbus/
+      - $DAPPDATA/cups/config:/config
+      - $DAPPDATA/cups/services:/services
     devices:
-      - /dev/bus/usb:/dev/bus/usb
+      - /dev/bus:/dev/bus
+      - /dev/usb:/dev/usb
   ## ---------- Media Center ---------- ##
   sonarr:
     <<: *common-keys-apps
@@ -247,6 +252,8 @@ services:
     image: lscr.io/linuxserver/transmission:latest
     environment:
       <<: *umask-tz-puid-pgid
+      USER: $TRANSMISSION_USER
+      PASS: $TRANSMISSION_PASS
     ports:
       - 9091:9091/tcp
       - 51413:51413/tcp
