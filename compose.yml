@@ -408,3 +408,13 @@ services:
       - 27017:27017/tcp
     volumes:
       - $DAPPDATA/mongodb/:/data/db
+  thelounge:
+    <<: *common-keys-core
+    container_name: thelounge
+    image: thelounge/thelounge
+    environment:
+      <<: *default-tz-puid-pgid
+    ports:
+      - 8090:9000
+    volumes:
+      - $DAPPDATA/thelounge:/var/opt/thelounge
